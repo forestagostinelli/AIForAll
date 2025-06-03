@@ -29,7 +29,7 @@ Bias parameter with biased data: `python linear_regression.py --lr 0.1 --bias 3`
 `python logistic_regression.py`
 
 ### Neural Network classification (2-d)
-python nnet_classification.py --dataset <dataset_name> --steps <training_steps> --lr <learning_rate>\
+`python nnet_classification.py --dataset <dataset_name> --steps <training_steps> --lr <learning_rate>`\
 Dataset names: lin, xor, half_moons
 
 ### MNIST Classification
