@@ -22,6 +22,7 @@ class Abs(nn.Module):
 class NNet(nn.Module):
     def __init__(self):
         super().__init__()
+        # EDIT here
         self.model = nn.Sequential(
             nn.Linear(2, 2),
             nn.Sigmoid(),
