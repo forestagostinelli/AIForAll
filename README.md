@@ -38,7 +38,8 @@ Dataset names: lin, xor, half_moons
 Linear model: `--lin`
 
 **Examples:**\
-Linear model: `python mnist_test.py --nnet models/mnist/mnist_lin.pt --dim 500 --lin`
+Linear model: `python mnist_test.py --nnet models/mnist/mnist_lin.pt --dim 500 --lin`\
+Neural network: `python mnist_test.py --nnet models/mnist/mnist_lenet.pt --dim 500`
 
 ## Recordings
 * 06/02: Linear Models | [recording](https://nam02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fsc-edu.zoom.us%2Frec%2Fshare%2FjMkw9j4lUtQUJ54GnVyx06k6kGfeXH7AvU5HNkSB6iD3KsxPQlRWW9dBbNqNXZTn.5XMjyRgPixHA51OE%3FstartTime%3D1748872185000&data=05%7C02%7CFORESTA%40cse.sc.edu%7Ca22c69c849004b24c0e508dda1f7c79a%7C4b2a4b19d135420e8bb2b1cd238998cc%7C0%7C0%7C638844807751730193%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=usi4%2FgG%2FNgfvrDl2bDv24qfEWQlAPapZdZE%2BZel5i1Q%3D&reserved=0)

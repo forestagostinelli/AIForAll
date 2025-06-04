@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from argparse import ArgumentParser
-from examples.train_mnist import get_nnet, get_nnet_lin
+from examples.train_mnist_utils import get_nnet_lin
 from model_defs.lenet import LeNet5
 
 from PIL import Image
@@ -128,10 +128,8 @@ def main():
     # load nnet
     if args.lin:
         nnet = get_nnet_lin()
-    elif args.nnet == "models/mnist/mnist_lenet.pt":
-        nnet = LeNet5()
     else:
-        nnet = get_nnet()
+        nnet = LeNet5()
     state_dict = torch.load(args.nnet)
     nnet.load_state_dict(state_dict)
     nnet.eval()

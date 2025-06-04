@@ -77,23 +77,6 @@ class FullyConnectedModel(nn.Module):
         return x
 
 
-def get_nnet() -> nn.Module:
-    class NNet(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.drop_input = nn.Dropout(p=0.1)
-            self.fc = FullyConnectedModel(784, [400, 400, 100, 10], ["relu", "relu", "relu", "linear"],
-                                          [0.1, 0.5, 0.5, 0.0])
-
-        def forward(self, x):
-            x = self.drop_input(x)
-            x = self.fc(x)
-
-            return x
-
-    return NNet()
-
-
 def get_nnet_lin() -> nn.Module:
     class NNet(nn.Module):
         def __init__(self):
@@ -170,7 +153,7 @@ def train_nnet(nnet: nn.Module, train_input_np: np.ndarray, train_labels_np: np.
             loss_val, acc_val = evaluate_nnet(nnet, val_input_np, val_labels_np)
             nnet.train()
 
-            print("Itr: %i, lr: %.2E, loss: %.5f, acc: %.2f, loss_val: %.5f, acc_val: %.2f, Time: %.2f" % (
+            print("Itr: %i, lr: %.2E, loss: %.2E, acc: %.2f, loss_val: %.2E, acc_val: %.2f, Time: %.2f" % (
                       train_itr, lr_itr, loss.item(), acc, loss_val, acc_val, time.time() - start_time))
 
             start_time = time.time()

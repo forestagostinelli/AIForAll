@@ -5,7 +5,7 @@ import numpy as np
 from torch.optim.optimizer import Optimizer
 import torch.optim as optim
 from torch import Tensor
-from examples.train_mnist_ae import get_decoder, get_encoder, get_encoder_variational, get_ae
+from examples.train_mnist_ae_utils import get_decoder, get_encoder, get_encoder_variational, get_ae
 
 import time
 from argparse import ArgumentParser

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from argparse import ArgumentParser
-from examples.train_mnist_ae import get_encoder, get_decoder, get_ae
+from examples.train_mnist_ae_utils import get_encoder, get_decoder, get_ae
 from model_defs.lenet import LeNet5
 
 from PIL import Image
