@@ -13,13 +13,22 @@ def get_nnet() -> nn.Module:
     class NNet(nn.Module):
         def __init__(self):
             super().__init__()
-            # EDIT here
+            # EDIT HERE
             self.model = nn.Sequential(
-                nn.Conv2d(1, 6, kernel_size=(3, 3)),
+                nn.Conv2d(1, 9, kernel_size=(3, 3), padding=1),
+                nn.ReLU(),
+                torch.nn.MaxPool2d(2),
+                nn.Conv2d(9, 9, kernel_size=(3, 3), padding=1),
+                nn.ReLU(),
+                torch.nn.MaxPool2d(2),
+                nn.Conv2d(9, 9, kernel_size=(3, 3), padding=1),
+                nn.ReLU(),
+                torch.nn.MaxPool2d(2),
+                nn.Conv2d(9, 9, kernel_size=(3, 3), padding=1),
                 nn.ReLU(),
                 torch.nn.MaxPool2d(2),
                 nn.Flatten(),
-                nn.Linear(1014, 15),
+                nn.Linear(9, 15),
                 nn.ReLU(),
                 nn.Dropout(p=0.1),
                 nn.Linear(15, 10),

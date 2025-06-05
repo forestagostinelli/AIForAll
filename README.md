@@ -28,11 +28,16 @@ Bias parameter with biased data: `python linear_regression.py --lr 0.1 --bias 3`
 **Examples:**\
 `python logistic_regression.py`
 
-### Neural Network classification (2-d)
-`python nnet_classification.py --dataset <dataset_name> --steps <training_steps> --lr <learning_rate>`\
-Dataset names: lin, xor, half_moons
+### 2-dimensional Neural Network classification
+`python 2D_train.py --dataset <dataset_name> --steps <training_steps> --lr <learning_rate>`\
+Dataset names: lin, xor, half_moons\
+Change model in "EDIT HERE" and see how it performs
 
-### MNIST Classification
+### Train Neural Network for MNIST Classification
+`python mnist_train.py`\
+Change model in "EDIT HERE" and see how it performs
+
+### Test Neural Network on MNIST Classification
 `python mnist_test.py --nnet <nnet_model> --dim <size_of_plot>`\
 **Switches**:\
 Linear model: `--lin`
@@ -40,9 +45,6 @@ Linear model: `--lin`
 **Examples:**\
 Linear model: `python mnist_test.py --nnet models/mnist/mnist_lin.pt --dim 500 --lin`\
 Neural network: `python mnist_test.py --nnet models/mnist/mnist_lenet.pt --dim 500`
-
-### Train MNIST Classification
-`python train_mnist.py`
 
 ### MNIST Autoencoders
 

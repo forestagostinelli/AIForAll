@@ -1,7 +1,5 @@
-from typing import Any, List
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +7,8 @@ from torch.optim.optimizer import Optimizer
 from argparse import ArgumentParser
 
 from sklearn.datasets import make_moons
+
+from utils.log_reg_utils import get_xor_data, update_decision_boundary
 
 
 class Abs(nn.Module):
@@ -22,11 +22,15 @@ class Abs(nn.Module):
 class NNet(nn.Module):
     def __init__(self):
         super().__init__()
-        # EDIT here
+        # EDIT HERE
         self.model = nn.Sequential(
-            nn.Linear(2, 2),
-            nn.Sigmoid(),
-            nn.Linear(2, 1),
+            nn.Linear(2, 3),
+            nn.Tanh(),
+            nn.Linear(3, 100),
+            nn.Tanh(),
+            nn.Linear(100, 3),
+            nn.Tanh(),
+            nn.Linear(3, 1),
             nn.Sigmoid(),
         )
 
@@ -34,28 +38,6 @@ class NNet(nn.Module):
         x = self.model(x.float())
 
         return x
-
-
-def update_decision_boundary(ax, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size, nnet):
-    nnet.eval()
-
-    ax.cla()
-
-    cm_decision = plt.cm.RdBu
-    cm_bright = ListedColormap(['#FF0000', '#0000FF'])
-
-    y_hat_mesh = nnet(torch.tensor(mesh_points)).detach().numpy()
-
-    y_hat_mesh = y_hat_mesh.reshape((mesh_size, mesh_size))
-
-    ax.contourf(x1_mesh, x2_mesh, y_hat_mesh, cmap=cm_decision)
-
-    ax.scatter(x[:, 0], x[:, 1], c=y, cmap=cm_bright)
-
-    ax.set_xlim([np.min(x[:, 0]), np.max(x[:, 0])])
-    ax.set_ylim([np.min(x[:, 1]), np.max(x[:, 1])])
-    ax.set_xlabel('x0')
-    ax.set_ylabel('x1')
 
 
 def main():
@@ -76,19 +58,7 @@ def main():
         x = np.concatenate((x_pos, x_neg), axis=0)
         y = np.array([1] * n + [0] * n)
     elif args.dataset == "xor":
-        point_locs = [[0, 0], [0, 1], [1, 0], [1, 1]]
-        point_labels = [0, 1, 1, 0]
-        x_l = []
-        y_l = []
-        for point_loc, point_label in zip(point_locs, point_labels):
-            num_loc: int = 50
-            x_loc = np.random.multivariate_normal(point_loc, np.array([[0.01, 0], [0, 0.01]]), num_loc)
-            y_loc = np.array([point_label] * num_loc)
-            x_l.append(x_loc)
-            y_l.append(y_loc)
-
-        x = np.concatenate(x_l, axis=0)
-        y = np.concatenate(y_l, axis=0)
+        x, y = get_xor_data()
     elif args.dataset == "half_moons":
         n: int = 200
         x, y = make_moons(n_samples=n, noise=0.1)
