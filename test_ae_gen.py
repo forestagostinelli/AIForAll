@@ -5,7 +5,7 @@ import numpy as np
 from torch.optim.optimizer import Optimizer
 import torch.optim as optim
 from torch import Tensor
-from examples.train_mnist_ae_utils import get_decoder, get_encoder, get_encoder_variational, get_ae
+from train_mnist_ae import get_decoder, get_encoder, get_encoder_variational, get_ae
 
 import time
 from argparse import ArgumentParser
@@ -177,9 +177,9 @@ def main():
         encoder: nn.Module = get_encoder_variational(args.cvae is not None)
     else:
         encoder: nn.Module = get_encoder()
-    encoder.load_state_dict(torch.load(f"{args.nnet}/encoder.pt"))
+    encoder.load_state_dict(torch.load(f"{args.nnet}/encoder.pt", weights_only=True))
     decoder: nn.Module = get_decoder(args.cvae is not None)
-    decoder.load_state_dict(torch.load(f"{args.nnet}/decoder.pt"))
+    decoder.load_state_dict(torch.load(f"{args.nnet}/decoder.pt", weights_only=True))
 
     nnet: nn.Module = get_ae(encoder, decoder, args.cvae is not None)
     encoder.eval()

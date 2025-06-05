@@ -1,10 +1,9 @@
-from typing import List, Tuple, Set
+from typing import Tuple, Set
 import torch
 import torch.nn as nn
 import numpy as np
 from argparse import ArgumentParser
-from examples.train_mnist_ae_utils import get_encoder, get_decoder, get_ae
-from model_defs.lenet import LeNet5
+from train_mnist_ae import get_encoder_variational, get_decoder, get_ae
 
 from PIL import Image
 import pylab
@@ -70,15 +69,16 @@ def main():
     parser.add_argument('--img', type=str, default="", help="")
     parser.add_argument('--dim', type=int, default=500, help="")
     parser.add_argument('--show', action='store_true', default=False, help="")
+    parser.add_argument('--cvae', action='store_true', default=False, help="")
     args = parser.parse_args()
 
     # load nnet
-    encoder: nn.Module = get_encoder()
+    encoder: nn.Module = get_encoder_variational(args.cvae)
     encoder.load_state_dict(torch.load(f"{args.nnet}/encoder.pt"))
-    decoder: nn.Module = get_decoder()
+    decoder: nn.Module = get_decoder(args.cvae)
     decoder.load_state_dict(torch.load(f"{args.nnet}/decoder.pt"))
 
-    nnet: nn.Module = get_ae(encoder, decoder)
+    nnet: nn.Module = get_ae(encoder, decoder, args.cvae)
     nnet.eval()
 
     line_ids = []
@@ -92,7 +92,7 @@ def main():
 
         im_np = 1.0 * (im_np/255 > 0.01)
 
-        print_nnet_output(nnet, im_np)
+        # print_nnet_output(nnet, im_np)
     else:
         root = tk.Tk()
 
