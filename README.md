@@ -31,7 +31,10 @@ Bias parameter with biased data: `python linear_regression.py --lr 0.1 --bias 3`
 ### 2-dimensional Neural Network classification
 `python 2D_train.py --dataset <dataset_name> --steps <training_steps> --lr <learning_rate>`\
 Dataset names: lin, xor, half_moons\
-Change model in "EDIT HERE" and see how it performs
+Change model in "EDIT HERE" and see how it performs\
+
+For specific xor classification visualization:\
+`python 2D_train.py --steps <training_steps> --lr <learning_rate>`\
 
 ### Train Neural Network for MNIST Classification
 `python mnist_train.py`\
