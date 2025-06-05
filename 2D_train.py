@@ -69,6 +69,7 @@ def main():
     ax.set(adjustable='box')
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.set_title("Decision Boundary")
 
     mesh_size: int = 100
     x1_vals_contour = np.linspace(np.min(x[:, 0]), np.max(x[:, 0]), mesh_size)
