@@ -1,4 +1,7 @@
 # AI for All
+<img src="./misc/images/lin_regress.png" width="300"> <img src="./misc/images/expln.png" width="300"> <br />
+<img src="./misc/images/xor.png" width="300"> <img src="./misc/images/vae.png" width="300"> 
+
 Code to reproduce instructional material for AI for All.
 
 ## Installation
@@ -21,9 +24,13 @@ No bias parameter: `python linear_regression.py --lr 0.1 --no_bias`\
 No bias parameter with biased data: `python linear_regression.py --lr 0.1 --bias 3 --no_bias`\
 Bias parameter with biased data: `python linear_regression.py --lr 0.1 --bias 3`
 
+Use the slider to go through the training steps.
+
 
 ### Logistic regression
 `python logistic_regression.py --lr <learning_rate> --steps <training_steps>`
+
+Use the slider to go through the training steps.
 
 **Examples:**\
 `python logistic_regression.py`
@@ -41,7 +48,7 @@ For specific xor classification visualization:\
 Change model in "EDIT HERE" and see how it performs
 
 ### Test Neural Network on MNIST Classification
-`python mnist_test.py --nnet <nnet_model> --dim <size_of_plot>`\
+`python mnist_test.py --nnet <nnet_file> --dim <size_of_plot>`\
 **Switches**:\
 Linear model: `--lin`
 
@@ -52,9 +59,9 @@ Neural network: `python mnist_test.py --nnet models/mnist/mnist_lenet.pt --dim 5
 ### MNIST Autoencoders
 
 #### Training
-Autoencoder: `python train_mnist_ae.py --save_dir models/mnist_ae/`\
-Variational autoencoder: `python train_mnist_ae.py --save_dir models/mnist_vae/ --vae`\
-Conditional variational autoencoder: `python train_mnist_ae.py --save_dir models/mnist_cvae/ --cvae`
+Autoencoder: `python train_mnist_ae.py --save_dir <nnet_directory>`\
+Variational autoencoder: `python train_mnist_ae.py --save_dir <nnet_directory> --vae`\
+Conditional variational autoencoder: `python train_mnist_ae.py --save_dir <nnet_directory> --cvae`
 
 #### Viewing latent space and reconstructions
 Autoencoder: `python test_ae_gen.py --nnet models/mnist_ae/`\

@@ -20,7 +20,6 @@ def update_decision_boundary(ax, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size,
     y_hat_mesh = y_hat_mesh_flat.reshape((mesh_size, mesh_size))
 
     ax.contourf(x1_mesh, x2_mesh, y_hat_mesh, cmap=cm_decision)
-
     ax.scatter(x[:, 0], x[:, 1], c=y, cmap=cm_bright)
 
     if xlim is None:
@@ -33,9 +32,12 @@ def update_decision_boundary(ax, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size,
     else:
         ax.set_ylim([ylim[0], ylim[1]])
 
-    ax.set_xlabel('x0')
-    ax.set_ylabel('x1')
+    # ax.set_xlabel('x0')
+    # ax.set_ylabel('x1')
     ax.set_title(title)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
 
 
 def get_xor_data():
