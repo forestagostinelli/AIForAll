@@ -41,7 +41,7 @@ Dataset names: lin, xor, half_moons\
 Change model in "EDIT HERE" and see how it performs
 
 For specific xor classification visualization:\
-`python 2D_train.py --steps <training_steps> --lr <learning_rate>`
+`python 2D_train_xor.py --steps <training_steps> --lr <learning_rate>`
 
 ### Train Neural Network for MNIST Classification
 `python mnist_train.py`\
