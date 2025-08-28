@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import torch
 
 
@@ -40,7 +41,7 @@ def update_decision_boundary(ax, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size,
     ax.set_yticks([])
 
 
-def get_xor_data():
+def get_xor_data() -> Tuple[NDArray, NDArray]:
     point_locs = [[0, 0], [0, 1], [1, 0], [1, 1]]
     point_labels = [0, 1, 1, 0]
     x_l = []

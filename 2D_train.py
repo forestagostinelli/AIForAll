@@ -6,9 +6,9 @@ import torch.optim as optim
 from torch.optim.optimizer import Optimizer
 from argparse import ArgumentParser
 
-from sklearn.datasets import make_moons
+from utils.get_data import get_2d_data
 
-from utils.log_reg_utils import get_xor_data, update_decision_boundary
+from utils.log_reg_utils import update_decision_boundary
 
 
 class Abs(nn.Module):
@@ -51,19 +51,7 @@ def main():
     np.random.seed(42)
     plt.ion()
 
-    if args.dataset == "lin":
-        n: int = 200
-        x_pos = np.random.multivariate_normal([-1, 1], np.array([[0.1, 0], [0, 0.1]]), n)
-        x_neg = np.random.multivariate_normal([1, -1], np.array([[0.1, 0], [0, 0.1]]), n)
-        x = np.concatenate((x_pos, x_neg), axis=0)
-        y = np.array([1] * n + [0] * n)
-    elif args.dataset == "xor":
-        x, y = get_xor_data()
-    elif args.dataset == "half_moons":
-        n: int = 200
-        x, y = make_moons(n_samples=n, noise=0.1)
-    else:
-        raise ValueError("Unknown dataset %s" % args.dataset)
+    x, y = get_2d_data(args.dataset)
 
     fig, ax = plt.subplots(1, 1)
     ax.set(adjustable='box')
