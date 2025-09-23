@@ -1,10 +1,12 @@
-from typing import Any, List
+from typing import List, Optional, Tuple
 import torch
 import torch.nn as nn
 import numpy as np
+from numpy.typing import NDArray
 from torch.optim.optimizer import Optimizer
 import torch.optim as optim
 from torch import Tensor
+from utils.mnist_utils import colors
 import time
 from argparse import ArgumentParser
 import pickle
@@ -12,18 +14,17 @@ import os
 import matplotlib.pyplot as plt
 
 
-def evaluate_nnet(nnet: nn.Module, val_input_np, val_labels_np, fig, axs, cvae: bool):
+def evaluate_nnet(nnet: nn.Module, val_input_np, val_labels_np, fig, axs, cvae: bool, cmnist: bool):
     nnet.eval()
     criterion = nn.MSELoss()
 
     val_input = torch.tensor(val_input_np).float()
-    val_labels = torch.tensor(val_labels_np).float()
-    if cvae:
-        ae_input = torch.cat((val_input, torch.unsqueeze(val_labels, 1)), dim=1)
-    else:
-        ae_input = val_input
 
-    nnet_output: Tensor = nnet(ae_input)
+    if cvae:
+        cond_enc, cond_dec = make_cond(cmnist, val_labels_np, False)
+        nnet_output: Tensor = nnet(val_input, torch.tensor(cond_enc), torch.tensor(cond_dec))
+    else:
+        nnet_output: Tensor = nnet(val_input)
 
     loss = criterion(nnet_output, val_input)
 
@@ -33,9 +34,9 @@ def evaluate_nnet(nnet: nn.Module, val_input_np, val_labels_np, fig, axs, cvae: 
         for ax in [ax_in, ax_out]:
             ax.cla()
 
-        plot_idx: int = plt_idxs[plot_num]
-        ax_in.imshow(val_input[plot_idx, :].reshape((28, 28)), cmap="gray")
-        ax_out.imshow(nnet_output.cpu().data.numpy()[plot_idx, :].reshape((28, 28)), cmap="gray")
+        plot_idx: int = int(plt_idxs[plot_num])
+        ax_in.imshow(val_input[plot_idx, :], cmap="gray")
+        ax_out.imshow(nnet_output.cpu().data.numpy()[plot_idx, :], cmap="gray")
 
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -60,9 +61,6 @@ def get_act_fn(act: str):
 
 
 class FullyConnectedModel(nn.Module):
-    def _forward_unimplemented(self, *input_val: Any) -> None:
-        pass
-
     def __init__(self, input_dim: int, dims: List[int], acts: List[str]):
         super().__init__()
         self.layers: nn.ModuleList[nn.ModuleList] = nn.ModuleList()
@@ -94,31 +92,63 @@ class FullyConnectedModel(nn.Module):
         return x
 
 
-def get_encoder() -> nn.Module:
-    class NNet(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.fc = FullyConnectedModel(784, [400, 100, 2], ["relu", "relu", "linear"])
+class EncoderConv(nn.Module):
+    def __init__(self, num_channels: int, latent_dim=2):
+        super().__init__()
+        self.conv1 = nn.Conv2d(num_channels, 32, 3, stride=2, padding=1)   # 28x28 -> 14x14
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)  # 14x14 -> 7x7
+        self.bn2 = nn.BatchNorm2d(32)
+        self.conv3 = nn.Conv2d(32, 32, 3, stride=2, padding=1) # 7x7 -> 4x4
+        self.bn3 = nn.BatchNorm2d(32)
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(32 * 4 * 4, latent_dim)
 
-        def forward(self, x):
-            x = self.fc(x)
+    def forward(self, x: Tensor, cond: Optional[Tensor] = None):
+        x = x.permute([0, 3, 1, 2])
+        if cond is not None:
+            x = torch.concat((x, cond.float()), dim=1)
+        x = nn.functional.relu(self.bn1(self.conv1(x)))
+        x = nn.functional.relu(self.bn2(self.conv2(x)))
+        x = nn.functional.relu(self.bn3(self.conv3(x)))
+        x = self.flatten(x)
+        z = self.fc(x)  # bottleneck
+        return z
 
-            return x
 
-    return NNet()
+class DecoderConv(nn.Module):
+    def __init__(self, num_channels: int, latent_dim=2):
+        super().__init__()
+        self.fc = nn.Linear(latent_dim, 32 * 4 * 4)
+        self.deconv1 = nn.ConvTranspose2d(32, 32, 3, stride=2, padding=1, output_padding=0)  # 4x4 -> 7x7
+        self.bn1 = nn.BatchNorm2d(32)
+        self.deconv2 = nn.ConvTranspose2d(32, 32, 3, stride=2, padding=1, output_padding=1)   # 7x7 -> 14x14
+        self.bn2 = nn.BatchNorm2d(32)
+        self.deconv3 = nn.ConvTranspose2d(32, num_channels, 3, stride=2, padding=1, output_padding=1)    # 14x14 -> 28x28
+
+    def forward(self, z, cond: Optional[Tensor] = None):
+        if cond is not None:
+            z = torch.cat((z, cond.float()), dim=1)
+        x = self.fc(z)
+        x = x.view(-1, 32, 4, 4)  # reshape into conv feature map
+        x = nn.functional.relu(self.bn1(self.deconv1(x)))
+        x = nn.functional.relu(self.bn2(self.deconv2(x)))
+        x = nn.functional.sigmoid(self.deconv3(x))
+        x = x.permute([0, 2, 3, 1])
+        return x
 
 
 class VAE(nn.Module):
-    def __init__(self, input_dim: int):
+    def __init__(self, encoder: nn.Module):
         super().__init__()
-        self.fc = FullyConnectedModel(input_dim, [400, 100, 2 * 2], ["relu", "relu", "linear"])
+        self.encoder: nn.Module = encoder
         self.N = torch.distributions.Normal(0, 1)
         # self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
         # self.N.scale = self.N.scale.cuda()
         self.kl = 0
 
-    def forward(self, x):
-        x = self.fc(x)
+    def forward(self, x, cond: Optional[Tensor] = None):
+        x = self.encoder(x, cond=cond)
         mu = x[:, :2]
         logvar = x[:, 2:]
         sigma = torch.exp(logvar / 2.0)
@@ -127,30 +157,43 @@ class VAE(nn.Module):
 
         return z
 
-
-class Decoder(nn.Module):
-    def __init__(self, input_dim: int):
-        super().__init__()
-        self.fc = FullyConnectedModel(input_dim, [100, 400, 784], ["relu", "relu", "linear"])
-
-    def forward(self, x):
-        x = self.fc(x)
-
-        return x
-
-
-def get_encoder_variational(cvae: bool) -> nn.Module:
-    if cvae:
-        return VAE(785)
+def get_encoder(cmnist: bool) -> nn.Module:
+    if cmnist:
+        num_channels: int = 3
     else:
-        return VAE(784)
+        num_channels: int = 1
+
+    return EncoderConv(num_channels)
 
 
-def get_decoder(cvae: bool) -> nn.Module:
-    if cvae:
-        return Decoder(3)
+def get_encoder_variational(cvae: bool, cmnist: bool) -> nn.Module:
+    if cmnist:
+        if cvae:
+            num_channels: int = 3 + 11 + (len(colors) + 1)
+        else:
+            num_channels: int = 3
     else:
-        return Decoder(2)
+        if cvae:
+            num_channels: int = 1 + 11
+        else:
+            num_channels: int = 1
+
+    return VAE(EncoderConv(num_channels, latent_dim=2 * 2))
+
+
+def get_decoder(cvae: bool, cmnist: bool) -> nn.Module:
+    latent_dim: int = 2
+    if cmnist:
+        num_channels: int = 3
+        if cvae:
+            latent_dim = 2 + 11 + (len(colors) + 1)
+
+    else:
+        num_channels: int = 1
+        if cvae:
+            latent_dim = 2 + 11
+
+    return DecoderConv(num_channels, latent_dim=latent_dim)
 
 
 class Autoencoder(nn.Module):
@@ -166,27 +209,79 @@ class Autoencoder(nn.Module):
         return x
 
 
-class AutoencoderCond(Autoencoder):
+class AutoencoderCond(nn.Module):
     def __init__(self, encoder: nn.Module, decoder: nn.Module):
-        super().__init__(encoder, decoder)
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
 
-    def forward(self, x):
-        labels = x[:, -1:]
-        x = self.encoder(x)
-        x = self.decoder(torch.cat((x, labels), dim=1))
+    def forward(self, x, cond_enc: Tensor, cond_dec):
+        x = self.encoder(x, cond=cond_enc)
+        x = self.decoder(x, cond=cond_dec)
 
         return x
 
 
-def get_ae(encoder: nn.Module, decoder: nn.Module, cvae: bool) -> Autoencoder:
+def get_ae(encoder: nn.Module, decoder: nn.Module, cvae: bool) -> nn.Module:
     if cvae:
         return AutoencoderCond(encoder, decoder)
     else:
         return Autoencoder(encoder, decoder)
 
 
-def train_nnet(nnet: Autoencoder, train_input_np: np.ndarray, train_labels_np: np.ndarray, val_input_np: np.ndarray,
-               val_labels_np: np.ndarray, fig, axs, vae: bool, cvae: bool) -> nn.Module:
+def one_hot_images(indices, max_int: int) -> np.ndarray:
+    """
+    Create one-hot KxNx28x28 tensor.
+
+    Args:
+        indices: Array of length N with values in [0, max_int-1]
+        max_int: K, number of categories
+
+    Returns:
+        np.ndarray: Shape (N, K, 28, 28), dtype=np.float32
+    """
+    # initialize zeros
+    out = np.zeros((indices.shape[0], max_int, 28, 28), dtype=np.float32)
+
+    # fill in one-hot slices
+    for k, idx in enumerate(indices):
+        out[k, idx] = 1.0  # whole 28x28 slice is ones
+
+    return out
+
+
+def make_cond(cmnist: bool, labels: NDArray, rand_dontcare: bool) -> Tuple[NDArray, NDArray]:
+    digit_num_cat: int = 11
+    colors_num_cat: int = len(colors) + 1
+    num: int = labels.shape[0]
+    if cmnist:
+        digit_labels: NDArray = labels[:, 0].copy().astype(int)
+    else:
+        digit_labels: NDArray = labels.copy().astype(int)
+
+    if rand_dontcare:
+        digit_mask = np.random.rand(num) < 0.1
+        digit_labels[digit_mask] = 10
+    digit_labels_enc = one_hot_images(digit_labels.astype(int), digit_num_cat)
+    digit_labels_dec = np.eye(digit_num_cat)[digit_labels]
+    if cmnist:
+        color_labels: NDArray = labels[:, 1].copy().astype(int)
+        if rand_dontcare:
+            color_mask = np.random.rand(num) < 0.1
+            color_labels[color_mask] = len(colors)
+        color_labels_enc = one_hot_images(color_labels.astype(int), colors_num_cat)
+        color_labels_dec = np.eye(colors_num_cat)[color_labels]
+        cond_enc = np.concatenate((digit_labels_enc, color_labels_enc), axis=1)
+        cond_dec = np.concatenate((digit_labels_dec, color_labels_dec), axis=1)
+    else:
+        cond_enc = digit_labels_enc
+        cond_dec = digit_labels_dec
+
+    return cond_enc, cond_dec
+
+
+def train_nnet(nnet: nn.Module, train_input_np: np.ndarray, train_labels_np: np.ndarray, val_input_np: np.ndarray,
+               val_labels_np: np.ndarray, fig, axs, vae: bool, cvae: bool, cmnist: bool) -> nn.Module:
     # optimization
     train_itr: int = 0
     batch_size: int = 200
@@ -195,6 +290,8 @@ def train_nnet(nnet: Autoencoder, train_input_np: np.ndarray, train_labels_np: n
         kl_weight: float = 0.005
     else:
         kl_weight: float = 0.01
+    if cmnist:
+        kl_weight = kl_weight / 10.0
 
     display_itrs = 100
     criterion = nn.MSELoss()
@@ -219,15 +316,12 @@ def train_nnet(nnet: Autoencoder, train_input_np: np.ndarray, train_labels_np: n
         # get data
         batch_idxs = np.random.randint(0, train_input_np.shape[0], size=batch_size)
         data_input_b = torch.tensor(train_input_np[batch_idxs]).float()
-        data_labels_b = torch.tensor(train_labels_np[batch_idxs]).float()
 
-        # forward
         if cvae:
-            ae_input = torch.cat((data_input_b, torch.unsqueeze(data_labels_b, 1)), dim=1)
+            cond_enc, cond_dec = make_cond(cmnist, train_labels_np[batch_idxs], True)
+            nnet_output_b: Tensor = nnet(data_input_b, torch.tensor(cond_enc), torch.tensor(cond_dec))
         else:
-            ae_input = data_input_b
-
-        nnet_output_b: Tensor = nnet(ae_input)
+            nnet_output_b: Tensor = nnet(data_input_b)
         # cost
         loss_recon = criterion(nnet_output_b, data_input_b)
         loss_kl = loss_recon * 0
@@ -245,7 +339,7 @@ def train_nnet(nnet: Autoencoder, train_input_np: np.ndarray, train_labels_np: n
         if train_itr % display_itrs == 0:
             nnet.eval()
 
-            loss_val = evaluate_nnet(nnet, val_input_np, val_labels_np, fig, axs, cvae)
+            loss_val = evaluate_nnet(nnet, val_input_np, val_labels_np, fig, axs, cvae, cmnist)
 
             nnet.train()
 
@@ -264,6 +358,7 @@ def main():
     parser.add_argument('--save_dir', type=str, default=None, help="")
     parser.add_argument('--vae', action='store_true', default=False, help="")
     parser.add_argument('--cvae', action='store_true', default=False, help="")
+    parser.add_argument('--cmnist', action='store_true', default=False, help="")
     args = parser.parse_args()
     plt.ion()
 
@@ -271,11 +366,15 @@ def main():
         os.makedirs(args.save_dir)
 
     # parse data
-    train_input_np, train_labels_np = pickle.load(open("data/mnist/mnist_train.pkl", "rb"))
-    train_input_np = train_input_np.reshape(-1, 28 * 28)
+    if args.cmnist:
+        train_input_np, train_labels_np = pickle.load(open("data/mnist/mnist_train_color.pkl", "rb"))
+        val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val_color.pkl", "rb"))
+    else:
+        train_input_np, train_labels_np = pickle.load(open("data/mnist/mnist_train.pkl", "rb"))
+        train_input_np = np.expand_dims(train_input_np, 3)
 
-    val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val.pkl", "rb"))
-    val_input_np = val_input_np.reshape(-1, 28 * 28)
+        val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val.pkl", "rb"))
+        val_input_np = np.expand_dims(val_input_np, 3)
 
     print(f"Training input shape: {train_input_np.shape}, Validation data shape: {val_input_np.shape}")
     fig, axs = plt.subplots(2, 3)
@@ -285,16 +384,17 @@ def main():
     # get nnet
     start_time = time.time()
     if args.vae or args.cvae:
-        encoder: nn.Module = get_encoder_variational(args.cvae)
-        decoder: nn.Module = get_decoder(args.cvae)
+        encoder: nn.Module = get_encoder_variational(args.cvae, args.cmnist)
+        decoder: nn.Module = get_decoder(args.cvae, args.cmnist)
     else:
-        encoder: nn.Module = get_encoder()
-        decoder: nn.Module = get_decoder(args.cvae)
+        encoder: nn.Module = get_encoder(args.cmnist)
+        decoder: nn.Module = get_decoder(args.cvae, args.cmnist)
 
-    ae: Autoencoder = get_ae(encoder, decoder, args.cvae)
+    ae: nn.Module = get_ae(encoder, decoder, args.cvae)
 
-    train_nnet(ae, train_input_np, train_labels_np, val_input_np, val_labels_np, fig, axs, args.vae, args.cvae)
-    loss = evaluate_nnet(ae, val_input_np, val_labels_np, fig, axs, args.cvae)
+    train_nnet(ae, train_input_np, train_labels_np, val_input_np, val_labels_np, fig, axs, args.vae, args.cvae,
+               args.cmnist)
+    loss = evaluate_nnet(ae, val_input_np, val_labels_np, fig, axs, args.cvae, args.cmnist)
     print(f"Loss: %.5f, Time: %.2f seconds" % (loss, time.time() - start_time))
 
     torch.save(encoder.state_dict(), f"{args.save_dir}/encoder.pt")

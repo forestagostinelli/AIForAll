@@ -2,42 +2,13 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.optim.optimizer import Optimizer
-import torch.optim as optim
-from torch import Tensor
-from train_mnist_ae import get_decoder, get_encoder, get_encoder_variational, get_ae
+from numpy.typing import NDArray
+from train_mnist_ae import get_decoder, get_encoder, get_encoder_variational, get_ae, make_cond
+from utils.mnist_utils import colors
 
-import time
 from argparse import ArgumentParser
 import pickle
 import matplotlib.pyplot as plt
-
-
-def evaluate_nnet(nnet: nn.Module, data_input_np, fig, axs):
-    nnet.eval()
-    criterion = nn.MSELoss()
-
-    val_input = torch.tensor(data_input_np).float()
-    nnet_output: Tensor = nnet(val_input)
-
-    loss = criterion(nnet_output, val_input)
-
-    plt_idxs = np.linspace(0, val_input.shape[0] - 1, axs.shape[1]).astype(int)
-    for plot_num in range(axs.shape[1]):
-        ax_in, ax_out = axs[:, plot_num]
-        for ax in [ax_in, ax_out]:
-            ax.cla()
-
-        plot_idx: int = plt_idxs[plot_num]
-        ax_in.imshow(val_input[plot_idx, :].reshape((28, 28)), cmap="gray")
-        ax_out.imshow(nnet_output.cpu().data.numpy()[plot_idx, :].reshape((28, 28)), cmap="gray")
-
-    fig.canvas.draw()
-    fig.canvas.flush_events()
-    fig.show()
-    plt.pause(0.01)
-
-    return loss.item()
 
 
 def print_event(event):
@@ -46,8 +17,17 @@ def print_event(event):
            event.x, event.y, event.xdata, event.ydata))
 
 
+def make_cond_arr(digit: int, color_idx: int, cmnist: bool, num: int) -> NDArray:
+    cond_arr = np.array([digit] * num)
+    if cmnist:
+        cond_arr_color = np.array([color_idx] * num)
+        cond_arr = np.stack((cond_arr, cond_arr_color), axis=1)
+
+    return cond_arr
+
+
 class MoveGraphLine:
-    def __init__(self, ax_click, ax_show, decoder: nn.Module, cvae: Optional[int]):
+    def __init__(self, ax_click, ax_show, decoder: nn.Module, digit: Optional[int], color_idx: int, cmnist: bool):
         self.ax_click = ax_click
         self.ax_show = ax_show
         self.decoder: nn.Module = decoder
@@ -56,7 +36,9 @@ class MoveGraphLine:
         self.point_plot = None
         self.pressed = False
         self.start = False
-        self.cvae: Optional[int] = cvae
+        self.digit: Optional[int] = digit
+        self.color_idx: int = color_idx
+        self.cmnist: bool = cmnist
 
     def mouse_release(self, _):
         if self.pressed:
@@ -89,76 +71,22 @@ class MoveGraphLine:
         self.point_plot = self.ax_click.scatter(enc_np[0, 0], enc_np[0, 1], marker='*', color='k')
 
         dec_input = torch.tensor(enc_np).float()
-        if self.cvae is not None:
-            val_labels = torch.tensor(self.cvae * np.ones((dec_input.shape[0], 1))).float()
-            dec_input = torch.cat((dec_input, val_labels), dim=1)
-
-        dec_output = self.decoder(dec_input).cpu().data.numpy()
+        if self.digit is not None:
+            cond_arr: NDArray = make_cond_arr(self.digit, self.color_idx, self.cmnist, 1)
+            _, cond_dec = make_cond(self.cmnist, cond_arr, False)
+            dec_output = self.decoder(dec_input, cond=torch.tensor(cond_dec)).cpu().data.numpy()
+        else:
+            dec_output = self.decoder(dec_input).cpu().data.numpy()
 
         self.ax_show.cla()
-        self.ax_show.imshow(dec_output[0, :].reshape((28, 28)), cmap="gray")
-
-
-def train_nnet(nnet: nn.Module, train_input_np: np.ndarray, val_input_np: np.ndarray, fig, axs) -> nn.Module:
-    # optimization
-    train_itr: int = 0
-    batch_size: int = 100
-    num_itrs: int = 10000
-
-    display_itrs = 100
-    criterion = nn.MSELoss()
-    lr: float = 0.001
-    lr_d: float = 0.99996
-    optimizer: Optimizer = optim.Adam(nnet.parameters(), lr=lr)
-    # optimizer: Optimizer = optim.SGD(nnet.parameters(), lr=lr, momentum=0.9)
-
-    # initialize status tracking
-    start_time = time.time()
-
-    nnet.train()
-    max_itrs: int = train_itr + num_itrs
-
-    while train_itr < max_itrs:
-        # zero the parameter gradients
-        optimizer.zero_grad()
-        lr_itr: float = lr * (lr_d ** train_itr)
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr_itr
-
-        # get data
-        batch_idxs = np.random.randint(0, train_input_np.shape[0], size=batch_size)
-        data_input_b = torch.tensor(train_input_np[batch_idxs]).float()
-
-        # forward
-        nnet_output_b: Tensor = nnet(data_input_b)
-
-        # cost
-        loss = criterion(nnet_output_b, data_input_b)
-
-        # backwards
-        loss.backward()
-
-        # step
-        optimizer.step()
-
-        # display progress
-        if train_itr % display_itrs == 0:
-            nnet.eval()
-            loss_val = evaluate_nnet(nnet, val_input_np, fig, axs)
-            nnet.train()
-
-            print("Itr: %i, lr: %.2E, loss: %.5f, loss_val: %.5f, Time: %.2f" % (
-                      train_itr, lr_itr, loss.item(), loss_val, time.time() - start_time))
-
-            start_time = time.time()
-
-        train_itr = train_itr + 1
-
-    return nnet
+        if dec_output.shape[3] == 1:
+            self.ax_show.imshow(dec_output[0, :], cmap="gray")
+        else:
+            self.ax_show.imshow(dec_output[0, :])
 
 
 def plot_color_coded(encoded, val_labels_np, ax):
-    for label in range(10):
+    for label in range(int(np.max(val_labels_np)) + 1):
         label_idxs = np.where(val_labels_np == label)
         ax.scatter(encoded[label_idxs, 0], encoded[label_idxs, 1], alpha=0.7, label=f"{label}")
 
@@ -167,47 +95,74 @@ def main():
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('--nnet', type=str, required=True, help="")
     parser.add_argument('--vae', action='store_true', default=False, help="")
-    parser.add_argument('--cvae', type=int, default=None, help="")
+    parser.add_argument('--cmnist', action='store_true', default=False, help="")
+    parser.add_argument('--digit', type=int, default=None, help="-1 is no digit specified")
+    parser.add_argument('--color', type=str, default=None, help="red, green, blue, yellow, purple. "
+                                                                "none is no color specified.")
     args = parser.parse_args()
 
     plt.ion()
 
+    cvae: bool = args.digit is not None
     # load nnet
-    if args.vae or (args.cvae is not None):
-        encoder: nn.Module = get_encoder_variational(args.cvae is not None)
+    if args.vae or cvae:
+        encoder: nn.Module = get_encoder_variational(cvae, args.cmnist)
     else:
-        encoder: nn.Module = get_encoder()
+        encoder: nn.Module = get_encoder(args.cmnist)
     encoder.load_state_dict(torch.load(f"{args.nnet}/encoder.pt", weights_only=True))
-    decoder: nn.Module = get_decoder(args.cvae is not None)
+    decoder: nn.Module = get_decoder(cvae, args.cmnist)
     decoder.load_state_dict(torch.load(f"{args.nnet}/decoder.pt", weights_only=True))
 
-    nnet: nn.Module = get_ae(encoder, decoder, args.cvae is not None)
+    nnet: nn.Module = get_ae(encoder, decoder, cvae)
     encoder.eval()
     decoder.eval()
     nnet.eval()
 
     # parse data
-    val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val.pkl", "rb"))
-    if args.cvae is not None:
-        cvae_idxs = np.where(val_labels_np == args.cvae)[0]
+    color_idx: int = -1
+    if args.color is not None:
+        if args.color == "none":
+            color_idx = len(colors)
+        else:
+            color_idx: int = [x[0] for x in colors].index(args.color)
+    if args.cmnist:
+        val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val_color.pkl", "rb"))
+    else:
+        val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val.pkl", "rb"))
+        val_input_np = np.expand_dims(val_input_np, 3)
+    if cvae:
+        if args.digit == -1:
+            cvae_idxs = np.arange(0, val_labels_np.shape[0])
+        else:
+            if args.cmnist:
+                cvae_idxs = np.where(val_labels_np[:, 0] == args.digit)[0]
+            else:
+                cvae_idxs = np.where(val_labels_np == args.digit)[0]
+        if args.cmnist:
+            if color_idx == len(colors):
+                cvae_idxs_color = np.arange(0, val_labels_np.shape[0])
+            else:
+                cvae_idxs_color = np.where(val_labels_np[:, 1] == color_idx)[0]
+            cvae_idxs = np.intersect1d(cvae_idxs_color, cvae_idxs)
         val_input_np = val_input_np[cvae_idxs]
         val_labels_np = val_labels_np[cvae_idxs]
-    val_input_np = val_input_np.reshape(-1, 28 * 28)
 
     val_input = torch.tensor(val_input_np).float()
-    if args.cvae is not None:
-        val_labels = torch.tensor(args.cvae * np.ones((val_input.shape[0], 1))).float()
-        ae_input = torch.cat((val_input, val_labels), dim=1)
+    if cvae:
+        cond_arr: NDArray = make_cond_arr(args.digit, color_idx, args.cmnist, val_input.size()[0])
+        cond_enc, _ = make_cond(args.cmnist, cond_arr, False)
+        encoded = encoder(val_input, cond=torch.tensor(cond_enc)).cpu().data.numpy()
     else:
-        ae_input = val_input
-
-    encoded = encoder(ae_input).cpu().data.numpy()
+        encoded = encoder(val_input).cpu().data.numpy()
 
     fig, axs = plt.subplots(1, 2)
     fig.show()
 
     # axs[0].scatter(encoded[:, 0], encoded[:, 1], alpha=0.1)
-    plot_color_coded(encoded, val_labels_np, axs[0])
+    if args.cmnist:
+        plot_color_coded(encoded, val_labels_np[:, 0], axs[0])
+    else:
+        plot_color_coded(encoded, val_labels_np, axs[0])
 
     for ax in axs:
         # ax.set_xlim(-5, 5)
@@ -217,34 +172,13 @@ def main():
 
     # plt.connect('button_press_event', onclick)
     # _ = fig.canvas.mpl_connect('button_press_event', onclick)
-    mgl = MoveGraphLine(axs[0], axs[1], decoder, args.cvae)
+    mgl = MoveGraphLine(axs[0], axs[1], decoder, args.digit, color_idx, args.cmnist)
     fig.canvas.mpl_connect('button_press_event', mgl.mouse_press)
     fig.canvas.mpl_connect('button_release_event', mgl.mouse_release)
     fig.canvas.mpl_connect('motion_notify_event', mgl.mouse_move)
     fig.show()
 
     plt.show(block=True)
-
-    """
-    while True:
-        in_val: str = input("x,y: ")
-        if len(in_val) == 0:
-            break
-        x_val, y_val = in_val.split(",")
-        enc_np = np.array((float(x_val), float(y_val)))
-        enc_np = np.expand_dims(enc_np, 0)
-
-        axs[0].cla()
-        plot_color_coded(encoded, val_labels_np, axs[0])
-        axs[0].legend(bbox_to_anchor=(1.75, -0.2), ncol=5)
-        axs[0].scatter(enc_np[0, 0], enc_np[0, 1], marker='*', color='k')
-
-        dec_input = torch.tensor(enc_np).float()
-        dec_output = decoder(dec_input).cpu().data.numpy()
-
-        axs[1].cla()
-        axs[1].imshow(dec_output[0, :].reshape((28, 28)), cmap="gray")
-    """
 
 
 if __name__ == "__main__":
