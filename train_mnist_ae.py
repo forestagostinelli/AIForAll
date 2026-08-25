@@ -281,10 +281,10 @@ def make_cond(cmnist: bool, labels: NDArray, rand_dontcare: bool) -> Tuple[NDArr
 
 
 def train_nnet(nnet: nn.Module, train_input_np: np.ndarray, train_labels_np: np.ndarray, val_input_np: np.ndarray,
-               val_labels_np: np.ndarray, fig, axs, vae: bool, cvae: bool, cmnist: bool) -> nn.Module:
+               val_labels_np: np.ndarray, fig, axs, vae: bool, cvae: bool, cmnist: bool, save_dir: str) -> nn.Module:
     # optimization
     train_itr: int = 0
-    batch_size: int = 200
+    batch_size: int = 50
     num_itrs: int = 10000
     if vae:
         kl_weight: float = 0.005
@@ -345,8 +345,11 @@ def train_nnet(nnet: nn.Module, train_input_np: np.ndarray, train_labels_np: np.
 
             print("Itr: %i, lr: %.2E, loss_recon: %.2E, loss_kl: %.2E, loss_val: %.2E, Time: %.2f" % (
                 train_itr, lr_itr, loss_recon.item(), loss_kl.item(), loss_val, time.time() - start_time))
+            torch.save(nnet.encoder.state_dict(), f"{save_dir}/encoder.pt")
+            torch.save(nnet.decoder.state_dict(), f"{save_dir}/decoder.pt")
 
             start_time = time.time()
+
 
         train_itr = train_itr + 1
 
@@ -369,6 +372,10 @@ def main():
     if args.cmnist:
         train_input_np, train_labels_np = pickle.load(open("data/mnist/mnist_train_color.pkl", "rb"))
         val_input_np, val_labels_np = pickle.load(open("data/mnist/mnist_val_color.pkl", "rb"))
+        # idxs_keep = np.logical_not(np.all(train_labels_np == np.array([0, 0]), axis=1))
+        # idxs_keep = train_labels_np[:, 1] != 0
+        # train_input_np = train_input_np[idxs_keep]
+        # train_labels_np = train_labels_np[idxs_keep]
     else:
         train_input_np, train_labels_np = pickle.load(open("data/mnist/mnist_train.pkl", "rb"))
         train_input_np = np.expand_dims(train_input_np, 3)
@@ -393,7 +400,7 @@ def main():
     ae: nn.Module = get_ae(encoder, decoder, args.cvae)
 
     train_nnet(ae, train_input_np, train_labels_np, val_input_np, val_labels_np, fig, axs, args.vae, args.cvae,
-               args.cmnist)
+               args.cmnist, args.save_dir)
     loss = evaluate_nnet(ae, val_input_np, val_labels_np, fig, axs, args.cvae, args.cmnist)
     print(f"Loss: %.5f, Time: %.2f seconds" % (loss, time.time() - start_time))
 

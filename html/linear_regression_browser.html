@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linear Regression Browser Demo</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v314.0.5/full/pyodide.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18212f;
+      --muted: #5f6b7a;
+      --line: #d5dce5;
+      --strong-line: #aeb8c5;
+      --accent: #0f766e;
+      --accent-dark: #0b5e58;
+      --danger: #b91c1c;
+      --shadow: 0 16px 40px rgba(24, 33, 47, 0.09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .settings,
+    .plot-panel,
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .settings {
+      border-radius: 8px;
+      padding: 18px;
+      position: sticky;
+      top: 18px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--strong-line);
+      border-radius: 6px;
+      color: var(--ink);
+      font: inherit;
+      padding: 8px 10px;
+      background: #fff;
+    }
+
+    input[type="number"]:focus,
+    input[type="range"]:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.25);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    input:disabled,
+    button:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-dark);
+    }
+
+    .message {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 650;
+    }
+
+    .message.error {
+      color: var(--danger);
+    }
+
+    .workspace {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .plot-panel {
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 500px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .plot-image {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+
+    .placeholder {
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 650;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) 88px minmax(240px, 1.6fr);
+      gap: 12px;
+      align-items: end;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+      background: #fbfcfd;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 750;
+      margin-bottom: 2px;
+    }
+
+    .metric output {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        padding: 16px;
+      }
+
+      .app,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .settings {
+        position: static;
+      }
+
+      .plot-panel {
+        min-height: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="app">
+    <section class="settings" aria-labelledby="settings-title">
+      <h1 id="settings-title">Linear Regression</h1>
+      <form id="settings-form">
+        <section aria-labelledby="data-title">
+          <h2 id="data-title">Data</h2>
+          <div class="field-grid">
+            <label for="slope">Line slope
+              <input id="slope" name="slope" type="number" value="3.0" step="0.1">
+            </label>
+            <label for="bias">Line bias
+              <input id="bias" name="bias" type="number" value="3.0" step="0.1">
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="training-title">
+          <h2 id="training-title">Training</h2>
+          <div class="field-grid">
+            <label for="lr">Learning rate
+              <input id="lr" name="lr" type="number" value="0.1" min="0" step="0.01">
+            </label>
+            <label for="steps">Training steps
+              <input id="steps" name="steps" type="number" value="100" min="0" max="2000" step="1">
+            </label>
+            <label for="w-init">Initial w
+              <input id="w-init" name="w_init" type="number" value="0.0" step="0.1">
+            </label>
+            <label for="b-init">Initial b
+              <input id="b-init" name="b_init" type="number" value="0.0" step="0.1">
+            </label>
+            <label class="checkbox-row" for="no-bias">
+              <input id="no-bias" name="no_bias" type="checkbox">
+              No bias parameter
+            </label>
+          </div>
+        </section>
+
+        <button id="run-button" type="submit" disabled>Run</button>
+        <div id="message" class="message" aria-live="polite">Loading Python...</div>
+      </form>
+    </section>
+
+    <section class="workspace" aria-label="Linear regression output">
+      <div class="plot-panel">
+        <img id="plot-image" class="plot-image" alt="Linear regression Matplotlib plot" hidden>
+        <div id="placeholder" class="placeholder">Loading Pyodide and Matplotlib...</div>
+      </div>
+
+      <section class="controls" aria-label="Training step controls">
+        <label for="step-slider">Training step
+          <input id="step-slider" type="range" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <label for="step-number">Step
+          <input id="step-number" type="number" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <div class="metrics" aria-label="Current training values">
+          <div class="metric"><span>w</span><output id="w-output">0</output></div>
+          <div class="metric"><span>b</span><output id="b-output">0</output></div>
+          <div class="metric"><span>loss</span><output id="loss-output">0</output></div>
+        </div>
+      </section>
+    </section>
+  </div>
+</main>
+
+<script id="python-code" type="text/python">
+from typing import List, Optional, Tuple
+import base64
+from io import BytesIO
+import json
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
+import numpy as np
+
+_RUN_CACHE = {}
+
+
+def get_data(slope: float, bias: float, rnd_seed: Optional[int]):
+    if rnd_seed is not None:
+        np.random.seed(rnd_seed)
+    n: int = 100
+    x = np.linspace(-1, 1, n)
+    y = slope * x + np.random.normal(0, 0.5, size=x.shape) + bias
+
+    return x, y
+
+
+def train_params(x, y, w_init: float, b_init: float, lr: float, steps: int,
+                 no_bias: bool) -> Tuple[List[float], List[float]]:
+    n: int = y.shape[0]
+    w: float = w_init
+    b: float = b_init
+    w_l: List[float] = [w]
+    if no_bias:
+        b = b * 0
+    b_l: List[float] = [b]
+    for i in range(steps):
+        w_grad = -np.sum((y - (w * x + b)) * x)/n
+        b_grad = -np.sum((y - (w * x + b)))/n
+        w = w - lr * w_grad
+        b = b - lr * b_grad
+
+        w_l.append(w)
+        if no_bias:
+            b = b * 0
+        b_l.append(b)
+
+    return w_l, b_l
+
+
+def loss_fn(x, y, w: float, b: float):
+    n: int = x.shape[0]
+    err = (np.sum((y - (w * x + b)) ** 2)) / (2 * n)
+    return err
+
+
+def get_run_state(lr: float, slope: float, bias: float, w_init: float,
+                  b_init: float, no_bias: bool, steps: int):
+    cache_key = (float(lr), float(slope), float(bias), float(w_init),
+                 float(b_init), bool(no_bias), int(steps))
+    if cache_key in _RUN_CACHE:
+        return _RUN_CACHE[cache_key]
+
+    x, y = get_data(slope, bias, rnd_seed=42)
+    w_l, b_l = train_params(x, y, w_init, b_init, lr, steps, no_bias)
+    w_vals = np.linspace(0, 6, 100)
+    state = {
+        "x": x,
+        "y": y,
+        "w_l": w_l,
+        "b_l": b_l,
+        "w_vals": w_vals,
+    }
+
+    if no_bias:
+        errs: List[int] = []
+        for w in w_vals:
+            err = loss_fn(x, y, w, 0.0)
+            errs.append(err)
+        state["errs"] = errs
+    else:
+        b_vals = np.linspace(0, 6, 100)
+        w_mesh, b_mesh = np.meshgrid(w_vals, b_vals)
+        errs_mesh = np.zeros(w_mesh.shape)
+        for idx1 in range(w_mesh.shape[0]):
+            for idx2 in range(w_mesh.shape[1]):
+                w = w_mesh[idx1, idx2]
+                b = b_mesh[idx1, idx2]
+                err = loss_fn(x, y, w, b)
+                errs_mesh[idx1, idx2] = err
+        state["b_vals"] = b_vals
+        state["w_mesh"] = w_mesh
+        state["b_mesh"] = b_mesh
+        state["errs_mesh"] = errs_mesh
+
+    _RUN_CACHE.clear()
+    _RUN_CACHE[cache_key] = state
+    return state
+
+
+def render_linear_regression(lr: float, slope: float, bias: float, w_init: float,
+                             b_init: float, no_bias: bool, steps: int, step: int):
+    steps = int(steps)
+    step = int(step)
+    if steps < 0:
+        raise ValueError("Training steps must be 0 or greater.")
+    if lr < 0:
+        raise ValueError("Learning rate must be 0 or greater.")
+
+    run_state = get_run_state(lr, slope, bias, w_init, b_init, no_bias, steps)
+    x = run_state["x"]
+    y = run_state["y"]
+    w_l = run_state["w_l"]
+    b_l = run_state["b_l"]
+    step = max(0, min(step, steps))
+    w_itr: float = w_l[step]
+    b_itr: float = b_l[step]
+    loss_val: float = loss_fn(x, y, w_itr, b_itr)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), dpi=140)
+    for ax in axs:
+        ax.set(adjustable='box')
+
+    axs[0].set_xlabel('x')
+    axs[0].set_ylabel('y')
+    axs[0].set_title('Data')
+    axs[0].scatter(x, y)
+    axs[0].plot(x, w_itr * x + b_itr, color='k', linewidth=5)
+
+    axs[1].set_title(f'Loss Surface ({loss_val:.2E})')
+    w_vals = run_state["w_vals"]
+    if no_bias:
+        axs[1].set_xlabel('w')
+        axs[1].set_ylabel('L')
+
+        axs[1].plot(w_vals, run_state["errs"])
+        axs[1].plot(w_itr, loss_val, marker='o', color='k', markersize=10)
+    else:
+        axs[1].set_xlabel('w')
+        axs[1].set_ylabel('b')
+        cp = axs[1].contourf(run_state["w_mesh"], run_state["b_mesh"], run_state["errs_mesh"])
+        fig.colorbar(cp)
+        axs[1].plot(w_itr, b_itr, marker='o', color='k', markersize=10)
+
+    for ax in axs:
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.2g'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2g'))
+
+    fig.tight_layout()
+    out = BytesIO()
+    fig.savefig(out, format="png", bbox_inches="tight")
+    plt.close(fig)
+    encoded = base64.b64encode(out.getvalue()).decode("ascii")
+
+    return json.dumps({
+        "image": "data:image/png;base64," + encoded,
+        "step": step,
+        "steps": steps,
+        "w": float(w_itr),
+        "b": float(b_itr),
+        "loss": float(loss_val),
+    })
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v314.0.5/full/";
+  var PLAY_DURATION_MS = 3000;
+  var MAX_PLAYBACK_FRAMES = 31;
+
+  var controls = {
+    form: document.getElementById("settings-form"),
+    lr: document.getElementById("lr"),
+    slope: document.getElementById("slope"),
+    bias: document.getElementById("bias"),
+    wInit: document.getElementById("w-init"),
+    bInit: document.getElementById("b-init"),
+    noBias: document.getElementById("no-bias"),
+    steps: document.getElementById("steps"),
+    runButton: document.getElementById("run-button"),
+    stepSlider: document.getElementById("step-slider"),
+    stepNumber: document.getElementById("step-number"),
+    message: document.getElementById("message"),
+    plotImage: document.getElementById("plot-image"),
+    placeholder: document.getElementById("placeholder"),
+    wOutput: document.getElementById("w-output"),
+    bOutput: document.getElementById("b-output"),
+    lossOutput: document.getElementById("loss-output")
+  };
+
+  var pyodide = null;
+  var renderPython = null;
+  var ready = null;
+  var renderTimer = null;
+  var renderSerial = 0;
+  var lastArgs = null;
+  var isPlaying = false;
+  var playbackToken = 0;
+  var playbackFrame = null;
+
+  function setMessage(text, isError) {
+    controls.message.textContent = text;
+    controls.message.classList.toggle("error", Boolean(isError));
+  }
+
+  function setControlsDisabled(disabled) {
+    var shouldDisable = disabled || isPlaying || !renderPython;
+    controls.runButton.disabled = shouldDisable;
+    controls.stepSlider.disabled = shouldDisable;
+    controls.stepNumber.disabled = shouldDisable;
+  }
+
+  function readNumber(input, name) {
+    var value = Number(input.value);
+    if (!Number.isFinite(value)) {
+      throw new Error(name + " must be a finite number.");
+    }
+    return value;
+  }
+
+  function readArgs() {
+    var steps = Math.floor(readNumber(controls.steps, "Training steps"));
+    if (steps < 0 || steps > 2000) {
+      throw new Error("Training steps must be between 0 and 2000.");
+    }
+    var lr = readNumber(controls.lr, "Learning rate");
+    if (lr < 0) {
+      throw new Error("Learning rate must be 0 or greater.");
+    }
+    return {
+      lr: lr,
+      slope: readNumber(controls.slope, "Line slope"),
+      bias: readNumber(controls.bias, "Line bias"),
+      wInit: readNumber(controls.wInit, "Initial w"),
+      bInit: readNumber(controls.bInit, "Initial b"),
+      noBias: controls.noBias.checked,
+      steps: steps
+    };
+  }
+
+  function formatFixed(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return value.toFixed(4);
+  }
+
+  function formatSci(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return value.toExponential(2).replace("e", "E");
+  }
+
+  function updateStepControls(step, steps) {
+    controls.stepSlider.max = String(steps);
+    controls.stepNumber.max = String(steps);
+    controls.stepSlider.value = String(step);
+    controls.stepNumber.value = String(step);
+  }
+
+  function updateResult(result) {
+    controls.plotImage.src = result.image;
+    controls.plotImage.hidden = false;
+    controls.placeholder.hidden = true;
+    updateStepControls(result.step, result.steps);
+    controls.wOutput.value = formatFixed(result.w);
+    controls.bOutput.value = formatFixed(result.b);
+    controls.lossOutput.value = formatSci(result.loss);
+  }
+
+  function cancelPlayback() {
+    isPlaying = false;
+    playbackToken += 1;
+    if (playbackFrame !== null) {
+      cancelAnimationFrame(playbackFrame);
+      playbackFrame = null;
+    }
+  }
+
+  async function initPyodideRuntime() {
+    try {
+      setMessage("Loading Python runtime...", false);
+      controls.placeholder.textContent = "Loading Python runtime...";
+      pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+
+      setMessage("Loading NumPy and Matplotlib...", false);
+      controls.placeholder.textContent = "Loading NumPy and Matplotlib...";
+      await pyodide.loadPackage(["numpy", "matplotlib"]);
+
+      setMessage("Preparing linear regression code...", false);
+      await pyodide.runPythonAsync(document.getElementById("python-code").textContent);
+      renderPython = pyodide.globals.get("render_linear_regression");
+
+      setMessage("Ready.", false);
+      setControlsDisabled(false);
+      await renderFromForm(0);
+    } catch (error) {
+      setControlsDisabled(true);
+      controls.placeholder.textContent = "Pyodide could not load.";
+      setMessage(error.message || String(error), true);
+      throw error;
+    }
+  }
+
+  async function renderPlot(args, step, options) {
+    options = options || {};
+    if (!renderPython) {
+      await ready;
+    }
+    var serial = renderSerial + 1;
+    renderSerial = serial;
+    setControlsDisabled(true);
+    if (!options.keepMessage) {
+      setMessage(options.message || "Rendering plot...", false);
+    }
+    try {
+      var resultJson = renderPython(
+        args.lr,
+        args.slope,
+        args.bias,
+        args.wInit,
+        args.bInit,
+        args.noBias,
+        args.steps,
+        step
+      );
+      if (serial === renderSerial) {
+        updateResult(JSON.parse(resultJson));
+        if (!options.keepMessage) {
+          setMessage("Ready.", false);
+        }
+      }
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    } finally {
+      if (serial === renderSerial && !isPlaying) {
+        setControlsDisabled(false);
+      }
+    }
+  }
+
+  async function renderFromForm(step) {
+    try {
+      lastArgs = readArgs();
+      controls.bInit.disabled = lastArgs.noBias;
+      updateStepControls(Math.max(0, Math.min(step, lastArgs.steps)), lastArgs.steps);
+      await renderPlot(lastArgs, step);
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  async function playFromForm() {
+    try {
+      cancelPlayback();
+      clearTimeout(renderTimer);
+      lastArgs = readArgs();
+      controls.bInit.disabled = lastArgs.noBias;
+      updateStepControls(0, lastArgs.steps);
+
+      if (lastArgs.steps === 0) {
+        await renderPlot(lastArgs, 0);
+        return;
+      }
+
+      isPlaying = true;
+      playbackToken += 1;
+      var token = playbackToken;
+      var frameCount = Math.min(MAX_PLAYBACK_FRAMES, lastArgs.steps + 1);
+      var startedAt = performance.now();
+      var lastFrameIndex = -1;
+
+      setControlsDisabled(true);
+      setMessage("Playing training steps...", false);
+
+      async function playFrame() {
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        var elapsed = performance.now() - startedAt;
+        var progress = Math.min(1, elapsed / PLAY_DURATION_MS);
+        var frameIndex = Math.round(progress * (frameCount - 1));
+        var step = Math.round(frameIndex * lastArgs.steps / (frameCount - 1));
+        updateStepControls(step, lastArgs.steps);
+
+        if (frameIndex !== lastFrameIndex) {
+          lastFrameIndex = frameIndex;
+          await renderPlot(lastArgs, step, { keepMessage: true });
+        }
+
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        if (performance.now() - startedAt >= PLAY_DURATION_MS) {
+          if (lastFrameIndex !== frameCount - 1) {
+            updateStepControls(lastArgs.steps, lastArgs.steps);
+            await renderPlot(lastArgs, lastArgs.steps, { keepMessage: true });
+          }
+          if (token === playbackToken) {
+            isPlaying = false;
+            playbackFrame = null;
+            setControlsDisabled(false);
+            setMessage("Ready.", false);
+          }
+          return;
+        }
+
+        playbackFrame = requestAnimationFrame(playFrame);
+      }
+
+      playbackFrame = requestAnimationFrame(playFrame);
+    } catch (error) {
+      isPlaying = false;
+      setControlsDisabled(false);
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  function scheduleStepRender(step) {
+    clearTimeout(renderTimer);
+    controls.stepNumber.value = String(step);
+    renderTimer = setTimeout(function () {
+      if (lastArgs) {
+        renderPlot(lastArgs, step);
+      }
+    }, 120);
+  }
+
+  controls.form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    playFromForm();
+  });
+
+  controls.stepSlider.addEventListener("input", function () {
+    cancelPlayback();
+    scheduleStepRender(Number(controls.stepSlider.value));
+  });
+
+  controls.stepNumber.addEventListener("change", function () {
+    cancelPlayback();
+    var value = Math.max(0, Math.min(Number(controls.stepNumber.value), Number(controls.stepNumber.max)));
+    updateStepControls(value, Number(controls.stepNumber.max));
+    scheduleStepRender(value);
+  });
+
+  controls.noBias.addEventListener("change", function () {
+    controls.bInit.disabled = controls.noBias.checked;
+  });
+
+  setControlsDisabled(true);
+  ready = initPyodideRuntime();
+})();
+</script>
+</body>
+</html>

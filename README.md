@@ -73,6 +73,7 @@ Variational autoencoder:\
 Conditional variational autoencoder:\
 `python test_ae_gen.py --nnet models/mnist_cvae/ --digit <number>`\
 `python test_ae_gen.py --nnet models/mnist_cvae_color/ --digit <number> --color <color_idx> --cmnist`
+`python test_ae_gen.py --nnet models/mnist_cvae_color_noredzero/ --digit <number> --color <color_idx> --cmnist`
 
 ## Visualizing data
 `python visualization/visualize_mnist.py --data <dataset name>`
