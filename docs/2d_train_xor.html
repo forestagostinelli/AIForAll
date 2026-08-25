@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XOR Neural Network Browser Demo</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v314.0.5/full/pyodide.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18212f;
+      --muted: #5f6b7a;
+      --line: #d5dce5;
+      --strong-line: #aeb8c5;
+      --accent: #0f766e;
+      --accent-dark: #0b5e58;
+      --danger: #b91c1c;
+      --shadow: 0 16px 40px rgba(24, 33, 47, 0.09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .settings,
+    .plot-panel,
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .settings {
+      border-radius: 8px;
+      padding: 18px;
+      position: sticky;
+      top: 18px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--strong-line);
+      border-radius: 6px;
+      color: var(--ink);
+      font: inherit;
+      padding: 8px 10px;
+      background: #fff;
+    }
+
+    input[type="number"]:focus,
+    select:focus,
+    input[type="range"]:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.25);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    input:disabled,
+    button:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-dark);
+    }
+
+    .message {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 650;
+    }
+
+    .message.error {
+      color: var(--danger);
+    }
+
+    .workspace {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .plot-panel {
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 620px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .plot-image {
+      display: block;
+      width: min(100%, 920px);
+      height: auto;
+      background: #fff;
+    }
+
+    .placeholder {
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 650;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) 88px minmax(240px, 1.6fr);
+      gap: 12px;
+      align-items: end;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+      background: #fbfcfd;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 750;
+      margin-bottom: 2px;
+    }
+
+    .metric output {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        padding: 16px;
+      }
+
+      .app,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .settings {
+        position: static;
+      }
+
+      .plot-panel {
+        min-height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="app">
+    <section class="settings" aria-labelledby="settings-title">
+      <h1 id="settings-title">XOR Neural Network</h1>
+      <form id="settings-form">
+        <section aria-labelledby="training-title">
+          <h2 id="training-title">Training</h2>
+          <div class="field-grid">
+            <label for="lr">Learning rate
+              <input id="lr" name="lr" type="number" value="0.01" min="0" step="0.001">
+            </label>
+            <label for="steps">Training steps
+              <input id="steps" name="steps" type="number" value="500" min="0" max="100000" step="1">
+            </label>
+            <label for="optimizer">Optimizer
+              <select id="optimizer" name="optimizer">
+                <option value="adam" selected>Adam</option>
+                <option value="sgd">Vanilla SGD</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <button id="run-button" type="submit" disabled>Run</button>
+        <div id="message" class="message" aria-live="polite">Loading Python...</div>
+      </form>
+    </section>
+
+    <section class="workspace" aria-label="XOR neural network output">
+      <div class="plot-panel">
+        <img id="plot-image" class="plot-image" alt="XOR neural network Matplotlib plot" hidden>
+        <div id="placeholder" class="placeholder">Loading Pyodide and Matplotlib...</div>
+      </div>
+
+      <section class="controls" aria-label="Training step controls">
+        <label for="step-slider">Training step
+          <input id="step-slider" type="range" min="0" max="500" step="1" value="0" disabled>
+        </label>
+        <label for="step-number">Step
+          <input id="step-number" type="number" min="0" max="500" step="1" value="0" disabled>
+        </label>
+        <div class="metrics" aria-label="Current training values">
+          <div class="metric"><span>loss</span><output id="loss-output">0</output></div>
+          <div class="metric"><span>accuracy</span><output id="accuracy-output">0</output></div>
+          <div class="metric"><span>step</span><output id="step-output">0</output></div>
+        </div>
+      </section>
+    </section>
+  </div>
+</main>
+
+<script id="python-code" type="text/python">
+from typing import List, Optional, Tuple
+import base64
+from io import BytesIO
+import json
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib.colors import ListedColormap
+import matplotlib.pyplot as plt
+import numpy as np
+
+from data_2d import get_xor_data
+from gradient_descent import adam_step, vanilla_sgd_step
+
+_RUN_CACHE = {}
+OPTIMIZER_STEPS = {
+    "adam": adam_step,
+    "sgd": vanilla_sgd_step,
+}
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
+
+
+def init_params():
+    bound_hidden = 1 / np.sqrt(2)
+    bound_output = 1 / np.sqrt(2)
+    return {
+        "w_hidden": np.random.uniform(-bound_hidden, bound_hidden, size=(2, 2)),
+        "b_hidden": np.random.uniform(-bound_hidden, bound_hidden, size=(2,)),
+        "w_output": np.random.uniform(-bound_output, bound_output, size=(1, 2)),
+        "b_output": np.random.uniform(-bound_output, bound_output, size=(1,)),
+    }
+
+
+def copy_params(params):
+    return {name: value.copy() for name, value in params.items()}
+
+
+def nnet_forward(x, params):
+    h = sigmoid(x @ params["w_hidden"].T + params["b_hidden"])
+    y_hat = sigmoid(h @ params["w_output"].T + params["b_output"])
+    return y_hat, h
+
+
+def nnet_1l_forward(x, weight, bias):
+    return sigmoid(x @ weight.reshape(-1, 1) + bias)
+
+
+def loss_fn(y_hat, y):
+    y_col = y.reshape(-1, 1)
+    y_hat = np.maximum(y_hat, 0.0000001)
+    y_hat = np.minimum(y_hat, 0.9999999)
+    return -np.sum(y_col * np.log(y_hat) + (1-y_col) * np.log(1-y_hat)) / y.shape[0]
+
+
+def accuracy_fn(y_hat, y):
+    preds = (y_hat[:, 0] >= 0.5).astype(int)
+    return np.mean(preds == y)
+
+
+def train_params(x, y, lr: float, steps: int, optimizer_name: str):
+    if optimizer_name not in OPTIMIZER_STEPS:
+        raise ValueError("Optimizer must be 'adam' or 'sgd'.")
+
+    optimizer_step = OPTIMIZER_STEPS[optimizer_name]
+    n: int = y.shape[0]
+    y_col = y.reshape(-1, 1)
+    params = init_params()
+    moments = {
+        "m": {name: np.zeros_like(value) for name, value in params.items()},
+        "v": {name: np.zeros_like(value) for name, value in params.items()},
+    }
+    params_l: List[dict] = [copy_params(params)]
+    losses: List[float] = []
+    accuracies: List[float] = []
+
+    y_hat, _ = nnet_forward(x, params)
+    losses.append(float(loss_fn(y_hat, y)))
+    accuracies.append(float(accuracy_fn(y_hat, y)))
+
+    for i in range(steps):
+        y_hat, hidden = nnet_forward(x, params)
+        dz_output = (y_hat - y_col) / n
+        grad_w_output = dz_output.T @ hidden
+        grad_b_output = np.sum(dz_output, axis=0)
+
+        d_hidden = dz_output @ params["w_output"]
+        dz_hidden = d_hidden * hidden * (1 - hidden)
+        grad_w_hidden = dz_hidden.T @ x
+        grad_b_hidden = np.sum(dz_hidden, axis=0)
+
+        grads = {
+            "w_hidden": grad_w_hidden,
+            "b_hidden": grad_b_hidden,
+            "w_output": grad_w_output,
+            "b_output": grad_b_output,
+        }
+
+        optimizer_step(params, grads, moments, lr, i + 1)
+        params_l.append(copy_params(params))
+
+        y_hat_after, _ = nnet_forward(x, params)
+        losses.append(float(loss_fn(y_hat_after, y)))
+        accuracies.append(float(accuracy_fn(y_hat_after, y)))
+
+    return params_l, losses, accuracies
+
+
+def update_decision_boundary(ax, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size, predict_fn,
+                             xlim: Optional[Tuple[float, float]] = None,
+                             ylim: Optional[Tuple[float, float]] = None):
+    title: str = ax.get_title()
+    ax.cla()
+
+    cm_decision = plt.cm.RdBu
+    cm_bright = ListedColormap(['#FF0000', '#0000FF'])
+
+    y_hat_mesh_flat = predict_fn(mesh_points)
+    y_hat_mesh = y_hat_mesh_flat.reshape((mesh_size, mesh_size))
+
+    ax.contourf(x1_mesh, x2_mesh, y_hat_mesh, cmap=cm_decision)
+    ax.scatter(x[:, 0], x[:, 1], c=y, cmap=cm_bright)
+
+    if xlim is None:
+        ax.set_xlim([np.min(x[:, 0]), np.max(x[:, 0])])
+    else:
+        ax.set_xlim([xlim[0], xlim[1]])
+
+    if ylim is None:
+        ax.set_ylim([np.min(x[:, 1]), np.max(x[:, 1])])
+    else:
+        ax.set_ylim([ylim[0], ylim[1]])
+
+    ax.set_title(title)
+    ax.set(adjustable='box')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def update_all_decision_boundaries(axs, x, y, x1_mesh, x2_mesh, mesh_points, mesh_size, params):
+    x_hid_l: List[np.ndarray] = []
+    for neuron_idx in range(2):
+        weight = params["w_hidden"][neuron_idx]
+        bias = params["b_hidden"][neuron_idx]
+        update_decision_boundary(
+            axs[neuron_idx],
+            x,
+            y,
+            x1_mesh,
+            x2_mesh,
+            mesh_points,
+            mesh_size,
+            lambda points, weight=weight, bias=bias: nnet_1l_forward(points, weight, bias),
+        )
+
+        y_hat_hid = nnet_1l_forward(x, weight, bias)
+        x_hid_l.append(y_hat_hid)
+
+    output_weight = params["w_output"][0]
+    output_bias = params["b_output"][0]
+    x_hid = np.concatenate(x_hid_l, axis=1)
+    update_decision_boundary(
+        axs[2],
+        x_hid,
+        y,
+        x1_mesh,
+        x2_mesh,
+        mesh_points,
+        mesh_size,
+        lambda points: nnet_1l_forward(points, output_weight, output_bias),
+        xlim=(np.min(x[:, 0]), np.max(x[:, 0])),
+        ylim=(np.min(x[:, 1]), np.max(x[:, 1])),
+    )
+    update_decision_boundary(
+        axs[3],
+        x,
+        y,
+        x1_mesh,
+        x2_mesh,
+        mesh_points,
+        mesh_size,
+        lambda points: nnet_forward(points, params)[0],
+    )
+
+
+def get_run_state(lr: float, steps: int, optimizer_name: str):
+    cache_key = (float(lr), int(steps), optimizer_name)
+    if cache_key in _RUN_CACHE:
+        return _RUN_CACHE[cache_key]
+
+    np.random.seed(42)
+    x, y = get_xor_data()
+    params_l, losses, accuracies = train_params(x, y, lr, steps, optimizer_name)
+
+    mesh_size: int = 100
+    x1_vals_contour = np.linspace(np.min(x[:, 0]), np.max(x[:, 0]), mesh_size)
+    x2_vals_contour = np.linspace(np.min(x[:, 1]), np.max(x[:, 1]), mesh_size)
+
+    x1_mesh, x2_mesh = np.meshgrid(x1_vals_contour, x2_vals_contour)
+    mesh_points = np.stack((x1_mesh.reshape(mesh_size * mesh_size), x2_mesh.reshape(mesh_size * mesh_size)), axis=1)
+
+    state = {
+        "x": x,
+        "y": y,
+        "params_l": params_l,
+        "losses": losses,
+        "accuracies": accuracies,
+        "x1_mesh": x1_mesh,
+        "x2_mesh": x2_mesh,
+        "mesh_points": mesh_points,
+        "mesh_size": mesh_size,
+    }
+
+    _RUN_CACHE.clear()
+    _RUN_CACHE[cache_key] = state
+    return state
+
+
+def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
+    steps = int(steps)
+    step = int(step)
+    if steps < 0:
+        raise ValueError("Training steps must be 0 or greater.")
+    if lr < 0:
+        raise ValueError("Learning rate must be 0 or greater.")
+    if optimizer_name not in OPTIMIZER_STEPS:
+        raise ValueError("Optimizer must be 'adam' or 'sgd'.")
+
+    run_state = get_run_state(lr, steps, optimizer_name)
+    step = max(0, min(step, steps))
+    params = run_state["params_l"][step]
+    loss_val: float = run_state["losses"][step]
+    accuracy_val: float = run_state["accuracies"][step]
+
+    fig, axs = plt.subplots(2, 2, figsize=(7, 7), dpi=140)
+    axs = axs.flatten()
+    for ax in axs:
+        ax.set(adjustable='box')
+        ax.set_xticks([])
+        ax.set_yticks([])
+    axs[0].set_title("Hidden Layer, Neuron 0")
+    axs[1].set_title("Hidden Layer, Neuron 1")
+    axs[2].set_title("Output with Hidden Layer Inputs")
+    axs[3].set_title("Output")
+
+    update_all_decision_boundaries(
+        axs,
+        run_state["x"],
+        run_state["y"],
+        run_state["x1_mesh"],
+        run_state["x2_mesh"],
+        run_state["mesh_points"],
+        run_state["mesh_size"],
+        params,
+    )
+
+    fig.suptitle("Itrs: %i, Train: %.2E" % (step, loss_val))
+    fig.tight_layout()
+    out = BytesIO()
+    fig.savefig(out, format="png", bbox_inches="tight")
+    plt.close(fig)
+    encoded = base64.b64encode(out.getvalue()).decode("ascii")
+
+    return json.dumps({
+        "image": "data:image/png;base64," + encoded,
+        "step": step,
+        "steps": steps,
+        "loss": float(loss_val),
+        "accuracy": float(accuracy_val),
+    })
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v314.0.5/full/";
+  var PLAY_DURATION_MS = 3000;
+  var MAX_PLAYBACK_FRAMES = 31;
+
+  var controls = {
+    form: document.getElementById("settings-form"),
+    lr: document.getElementById("lr"),
+    steps: document.getElementById("steps"),
+    optimizer: document.getElementById("optimizer"),
+    runButton: document.getElementById("run-button"),
+    stepSlider: document.getElementById("step-slider"),
+    stepNumber: document.getElementById("step-number"),
+    message: document.getElementById("message"),
+    plotImage: document.getElementById("plot-image"),
+    placeholder: document.getElementById("placeholder"),
+    lossOutput: document.getElementById("loss-output"),
+    accuracyOutput: document.getElementById("accuracy-output"),
+    stepOutput: document.getElementById("step-output")
+  };
+
+  var pyodide = null;
+  var renderPython = null;
+  var ready = null;
+  var renderTimer = null;
+  var renderSerial = 0;
+  var lastArgs = null;
+  var isPlaying = false;
+  var playbackToken = 0;
+  var playbackFrame = null;
+
+  function setMessage(text, isError) {
+    controls.message.textContent = text;
+    controls.message.classList.toggle("error", Boolean(isError));
+  }
+
+  function setControlsDisabled(disabled) {
+    var shouldDisable = disabled || isPlaying || !renderPython;
+    controls.runButton.disabled = shouldDisable;
+    controls.stepSlider.disabled = shouldDisable;
+    controls.stepNumber.disabled = shouldDisable;
+  }
+
+  function readNumber(input, name) {
+    var value = Number(input.value);
+    if (!Number.isFinite(value)) {
+      throw new Error(name + " must be a finite number.");
+    }
+    return value;
+  }
+
+  function readArgs() {
+    var steps = Math.floor(readNumber(controls.steps, "Training steps"));
+    if (steps < 0 || steps > 100000) {
+      throw new Error("Training steps must be between 0 and 100000.");
+    }
+    var lr = readNumber(controls.lr, "Learning rate");
+    if (lr < 0) {
+      throw new Error("Learning rate must be 0 or greater.");
+    }
+    return {
+      lr: lr,
+      steps: steps,
+      optimizer: controls.optimizer.value
+    };
+  }
+
+  function formatSci(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return value.toExponential(2).replace("e", "E");
+  }
+
+  function formatPercent(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return (value * 100).toFixed(1) + "%";
+  }
+
+  function updateStepControls(step, steps) {
+    controls.stepSlider.max = String(steps);
+    controls.stepNumber.max = String(steps);
+    controls.stepSlider.value = String(step);
+    controls.stepNumber.value = String(step);
+  }
+
+  function updateResult(result) {
+    controls.plotImage.src = result.image;
+    controls.plotImage.hidden = false;
+    controls.placeholder.hidden = true;
+    updateStepControls(result.step, result.steps);
+    controls.lossOutput.value = formatSci(result.loss);
+    controls.accuracyOutput.value = formatPercent(result.accuracy);
+    controls.stepOutput.value = String(result.step);
+  }
+
+  function cancelPlayback() {
+    isPlaying = false;
+    playbackToken += 1;
+    if (playbackFrame !== null) {
+      cancelAnimationFrame(playbackFrame);
+      playbackFrame = null;
+    }
+  }
+
+  async function loadPythonModule(sourcePath, moduleFileName) {
+    try {
+      var response = await fetch(sourcePath);
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+      pyodide.FS.writeFile(moduleFileName, await response.text());
+    } catch (error) {
+      throw new Error(
+        "Could not load " + sourcePath + ". If this page was opened with file://, serve the docs folder over HTTP instead: cd docs && python -m http.server 8000 " +
+              "then open http://localhost:8000/index.html in browser"
+      );
+    }
+  }
+
+  async function initPyodideRuntime() {
+    try {
+      setMessage("Loading Python runtime...", false);
+      controls.placeholder.textContent = "Loading Python runtime...";
+      pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+
+      setMessage("Loading NumPy and Matplotlib...", false);
+      controls.placeholder.textContent = "Loading NumPy and Matplotlib...";
+      await pyodide.loadPackage(["numpy", "matplotlib"]);
+
+      setMessage("Loading shared Python modules...", false);
+      controls.placeholder.textContent = "Loading shared Python modules...";
+      await loadPythonModule("python/data_2d.py", "data_2d.py");
+      await loadPythonModule("python/gradient_descent.py", "gradient_descent.py");
+
+      setMessage("Preparing XOR training code...", false);
+      await pyodide.runPythonAsync(document.getElementById("python-code").textContent);
+      renderPython = pyodide.globals.get("render_xor_training");
+
+      setMessage("Ready.", false);
+      setControlsDisabled(false);
+      await renderFromForm(0);
+    } catch (error) {
+      setControlsDisabled(true);
+      controls.placeholder.textContent = "Pyodide could not load.";
+      setMessage(error.message || String(error), true);
+      throw error;
+    }
+  }
+
+  async function renderPlot(args, step, options) {
+    options = options || {};
+    if (!renderPython) {
+      await ready;
+    }
+    var serial = renderSerial + 1;
+    renderSerial = serial;
+    setControlsDisabled(true);
+    if (!options.keepMessage) {
+      setMessage(options.message || "Rendering plot...", false);
+    }
+    try {
+      var resultJson = renderPython(args.lr, args.steps, args.optimizer, step);
+      if (serial === renderSerial) {
+        updateResult(JSON.parse(resultJson));
+        if (!options.keepMessage) {
+          setMessage("Ready.", false);
+        }
+      }
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    } finally {
+      if (serial === renderSerial && !isPlaying) {
+        setControlsDisabled(false);
+      }
+    }
+  }
+
+  async function renderFromForm(step) {
+    try {
+      lastArgs = readArgs();
+      updateStepControls(Math.max(0, Math.min(step, lastArgs.steps)), lastArgs.steps);
+      await renderPlot(lastArgs, step);
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  async function playFromForm() {
+    try {
+      cancelPlayback();
+      clearTimeout(renderTimer);
+      lastArgs = readArgs();
+      updateStepControls(0, lastArgs.steps);
+
+      if (lastArgs.steps === 0) {
+        await renderPlot(lastArgs, 0);
+        return;
+      }
+
+      isPlaying = true;
+      playbackToken += 1;
+      var token = playbackToken;
+      var frameCount = Math.min(MAX_PLAYBACK_FRAMES, lastArgs.steps + 1);
+      var startedAt = performance.now();
+      var lastFrameIndex = -1;
+
+      setControlsDisabled(true);
+      setMessage("Playing training steps...", false);
+
+      async function playFrame() {
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        var elapsed = performance.now() - startedAt;
+        var progress = Math.min(1, elapsed / PLAY_DURATION_MS);
+        var frameIndex = Math.round(progress * (frameCount - 1));
+        var step = Math.round(frameIndex * lastArgs.steps / (frameCount - 1));
+        updateStepControls(step, lastArgs.steps);
+
+        if (frameIndex !== lastFrameIndex) {
+          lastFrameIndex = frameIndex;
+          await renderPlot(lastArgs, step, { keepMessage: true });
+        }
+
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        if (performance.now() - startedAt >= PLAY_DURATION_MS) {
+          if (lastFrameIndex !== frameCount - 1) {
+            updateStepControls(lastArgs.steps, lastArgs.steps);
+            await renderPlot(lastArgs, lastArgs.steps, { keepMessage: true });
+          }
+          if (token === playbackToken) {
+            isPlaying = false;
+            playbackFrame = null;
+            setControlsDisabled(false);
+            setMessage("Ready.", false);
+          }
+          return;
+        }
+
+        playbackFrame = requestAnimationFrame(playFrame);
+      }
+
+      playbackFrame = requestAnimationFrame(playFrame);
+    } catch (error) {
+      isPlaying = false;
+      setControlsDisabled(false);
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  function scheduleStepRender(step) {
+    clearTimeout(renderTimer);
+    controls.stepNumber.value = String(step);
+    renderTimer = setTimeout(function () {
+      if (lastArgs) {
+        renderPlot(lastArgs, step);
+      }
+    }, 120);
+  }
+
+  controls.form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    playFromForm();
+  });
+
+  controls.stepSlider.addEventListener("input", function () {
+    cancelPlayback();
+    scheduleStepRender(Number(controls.stepSlider.value));
+  });
+
+  controls.stepNumber.addEventListener("change", function () {
+    cancelPlayback();
+    var value = Math.max(0, Math.min(Number(controls.stepNumber.value), Number(controls.stepNumber.max)));
+    updateStepControls(value, Number(controls.stepNumber.max));
+    scheduleStepRender(value);
+  });
+
+  setControlsDisabled(true);
+  ready = initPyodideRuntime();
+})();
+</script>
+</body>
+</html>
