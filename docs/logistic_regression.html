@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logistic Regression Browser Demo</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v314.0.5/full/pyodide.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18212f;
+      --muted: #5f6b7a;
+      --line: #d5dce5;
+      --strong-line: #aeb8c5;
+      --accent: #0f766e;
+      --accent-dark: #0b5e58;
+      --danger: #b91c1c;
+      --shadow: 0 16px 40px rgba(24, 33, 47, 0.09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .settings,
+    .plot-panel,
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .settings {
+      border-radius: 8px;
+      padding: 18px;
+      position: sticky;
+      top: 18px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--strong-line);
+      border-radius: 6px;
+      color: var(--ink);
+      font: inherit;
+      padding: 8px 10px;
+      background: #fff;
+    }
+
+    input[type="number"]:focus,
+    input[type="range"]:focus {
+      outline: 2px solid rgba(15, 118, 110, 0.25);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    input:disabled,
+    button:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
+
+    button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-dark);
+    }
+
+    .message {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 650;
+    }
+
+    .message.error {
+      color: var(--danger);
+    }
+
+    .workspace {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .plot-panel {
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 500px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .plot-image {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+
+    .placeholder {
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 650;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) 88px minmax(240px, 1.6fr);
+      gap: 12px;
+      align-items: end;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+      background: #fbfcfd;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 750;
+      margin-bottom: 2px;
+    }
+
+    .metric output {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        padding: 16px;
+      }
+
+      .app,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .settings {
+        position: static;
+      }
+
+      .plot-panel {
+        min-height: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="app">
+    <section class="settings" aria-labelledby="settings-title">
+      <h1 id="settings-title">Logistic Regression</h1>
+      <form id="settings-form">
+        <section aria-labelledby="training-title">
+          <h2 id="training-title">Training</h2>
+          <div class="field-grid">
+            <label for="lr">Learning rate
+              <input id="lr" name="lr" type="number" value="1" min="0" step="0.1">
+            </label>
+            <label for="steps">Training steps
+              <input id="steps" name="steps" type="number" value="100" min="0" max="2000" step="1">
+            </label>
+            <label for="w0-init">Initial w0
+              <input id="w0-init" name="w0_init" type="number" value="2.0" step="0.1">
+            </label>
+            <label for="w1-init">Initial w1
+              <input id="w1-init" name="w1_init" type="number" value="0.5" step="0.1">
+            </label>
+          </div>
+        </section>
+
+        <button id="run-button" type="submit" disabled>Run</button>
+        <div id="message" class="message" aria-live="polite">Loading Python...</div>
+      </form>
+    </section>
+
+    <section class="workspace" aria-label="Logistic regression output">
+      <div class="plot-panel">
+        <img id="plot-image" class="plot-image" alt="Logistic regression Matplotlib plot" hidden>
+        <div id="placeholder" class="placeholder">Loading Pyodide and Matplotlib...</div>
+      </div>
+
+      <section class="controls" aria-label="Training step controls">
+        <label for="step-slider">Training step
+          <input id="step-slider" type="range" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <label for="step-number">Step
+          <input id="step-number" type="number" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <div class="metrics" aria-label="Current training values">
+          <div class="metric"><span>w0</span><output id="w0-output">0</output></div>
+          <div class="metric"><span>w1</span><output id="w1-output">0</output></div>
+          <div class="metric"><span>loss</span><output id="loss-output">0</output></div>
+        </div>
+      </section>
+    </section>
+  </div>
+</main>
+
+<script id="python-code" type="text/python">
+from typing import List, Optional, Tuple
+import base64
+from io import BytesIO
+import json
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib.colors import ListedColormap
+from matplotlib.ticker import FormatStrFormatter
+import matplotlib.pyplot as plt
+import numpy as np
+
+_RUN_CACHE = {}
+
+
+def fprop(x, w0, w1):
+    b: float = 0.0
+    y_hat = 1 / (1 + np.exp(-(w0 * x[:, 0] + w1 * x[:, 1] + b)))
+    return y_hat
+
+
+def loss_fn(x, y, w0, w1):
+    n: int = x.shape[0]
+    y_hat = fprop(x, w0, w1)
+    y_hat = np.maximum(y_hat, 0.0000001)
+    y_hat = np.minimum(y_hat, 0.9999999)
+    loss = -np.sum(y * np.log(y_hat) + (1-y) * np.log(1-y_hat))/n
+    return loss
+
+
+def get_data(rnd_seed: Optional[int]):
+    if rnd_seed is not None:
+        np.random.seed(rnd_seed)
+
+    num_pos: int = 200
+    num_neg: int = 200
+
+    gauss_std: float = 0.5
+    x_pos = np.random.multivariate_normal([-1, 1], [[gauss_std, 0], [0, gauss_std]], num_pos)
+    x_neg = np.random.multivariate_normal([1, -1], [[gauss_std, 0], [0, gauss_std]], num_neg)
+    x = np.concatenate((x_pos, x_neg), axis=0)
+    y = np.array([1] * num_pos + [0] * num_neg)
+
+    return x, y
+
+
+def train_params(x, y, w0_init: float, w1_init: float, lr: float, steps: int) -> Tuple[List[float], List[float]]:
+    n: int = y.shape[0]
+    w0: float = w0_init
+    w1: float = w1_init
+    w0_l: List[float] = [w0]
+    w1_l: List[float] = [w1]
+    for i in range(steps):
+        y_hat = fprop(x, w0, w1)
+        w0_grad = np.sum((y_hat - y) * x[:, 0]) / n
+        w1_grad = np.sum((y_hat - y) * x[:, 1]) / n
+
+        w0 = w0 - lr * w0_grad
+        w1 = w1 - lr * w1_grad
+        w0_l.append(w0)
+        w1_l.append(w1)
+
+    return w0_l, w1_l
+
+
+def update_decision_boundary(ax, x, y, x0_mesh, x1_mesh, mesh_points, mesh_size, w0, w1, b):
+    ax.cla()
+    x1_range = np.linspace(np.min(x), np.max(x), x0_mesh.shape[0])
+
+    cm_decision = plt.cm.RdBu
+    cm_bright = ListedColormap(['#FF0000', '#0000FF'])
+
+    y_hat_mesh = fprop(mesh_points, w0, w1)
+    y_hat_mesh = y_hat_mesh.reshape((mesh_size, mesh_size))
+
+    ax.contourf(x0_mesh, x1_mesh, y_hat_mesh, cmap=cm_decision)
+
+    ax.scatter(x[:, 0], x[:, 1], c=y, cmap=cm_bright)
+
+    ax.plot(x1_range, (-w0 * x1_range - b) / (w1 + 0.000001), color='k', linewidth=5)
+
+    ax.set_xlim([np.min(x[:, 0]), np.max(x[:, 0])])
+    ax.set_ylim([np.min(x[:, 1]), np.max(x[:, 1])])
+    ax.set_xlabel('x0')
+    ax.set_ylabel('x1')
+
+
+def get_run_state(lr: float, w0_init: float, w1_init: float, steps: int):
+    cache_key = (float(lr), float(w0_init), float(w1_init), int(steps))
+    if cache_key in _RUN_CACHE:
+        return _RUN_CACHE[cache_key]
+
+    x, y = get_data(rnd_seed=42)
+    w0_l, w1_l = train_params(x, y, w0_init, w1_init, lr, steps)
+
+    w0_vals = np.linspace(-6, 6, 100)
+    w1_vals = np.linspace(-6, 6, 100)
+
+    w0_mesh, w1_mesh = np.meshgrid(w0_vals, w1_vals)
+    errs_mesh = np.zeros(w0_mesh.shape)
+
+    for idx1 in range(w0_mesh.shape[0]):
+        for idx2 in range(w0_mesh.shape[1]):
+            w0 = w0_mesh[idx1, idx2]
+            w1 = w1_mesh[idx1, idx2]
+            err = loss_fn(x, y, w0, w1)
+            errs_mesh[idx1, idx2] = err
+
+    mesh_size: int = 100
+    x0_vals_contour = np.linspace(np.min(x[:, 0]), np.max(x[:, 0]), mesh_size)
+    x1_vals_contour = np.linspace(np.min(x[:, 1]), np.max(x[:, 1]), mesh_size)
+
+    x0_mesh, x1_mesh = np.meshgrid(x0_vals_contour, x1_vals_contour)
+    mesh_points = np.stack((x0_mesh.reshape(mesh_size*mesh_size), x1_mesh.reshape(mesh_size*mesh_size)), axis=1)
+
+    state = {
+        "x": x,
+        "y": y,
+        "w0_l": w0_l,
+        "w1_l": w1_l,
+        "w0_mesh": w0_mesh,
+        "w1_mesh": w1_mesh,
+        "errs_mesh": errs_mesh,
+        "x0_mesh": x0_mesh,
+        "x1_mesh": x1_mesh,
+        "mesh_points": mesh_points,
+        "mesh_size": mesh_size,
+    }
+
+    _RUN_CACHE.clear()
+    _RUN_CACHE[cache_key] = state
+    return state
+
+
+def render_logistic_regression(lr: float, w0_init: float, w1_init: float, steps: int, step: int):
+    steps = int(steps)
+    step = int(step)
+    if steps < 0:
+        raise ValueError("Training steps must be 0 or greater.")
+    if lr < 0:
+        raise ValueError("Learning rate must be 0 or greater.")
+
+    run_state = get_run_state(lr, w0_init, w1_init, steps)
+    x = run_state["x"]
+    y = run_state["y"]
+    w0_l = run_state["w0_l"]
+    w1_l = run_state["w1_l"]
+
+    step = max(0, min(step, steps))
+    w0_itr: float = w0_l[step]
+    w1_itr: float = w1_l[step]
+    loss_val: float = loss_fn(x, y, w0_itr, w1_itr)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), dpi=140)
+    for ax in axs:
+        ax.set(adjustable='box')
+
+    update_decision_boundary(
+        axs[0],
+        x,
+        y,
+        run_state["x0_mesh"],
+        run_state["x1_mesh"],
+        run_state["mesh_points"],
+        run_state["mesh_size"],
+        w0_itr,
+        w1_itr,
+        0,
+    )
+
+    axs[1].set_xlabel('w0')
+    axs[1].set_ylabel('w1')
+    axs[1].set_title(f'Loss Surface ({loss_val:.2E})')
+
+    cp = axs[1].contourf(run_state["w0_mesh"], run_state["w1_mesh"], run_state["errs_mesh"])
+    fig.colorbar(cp)
+    axs[1].plot(w0_itr, w1_itr, marker='o', color='k', markersize=10)
+
+    for ax in axs:
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.2g'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.2g'))
+
+    fig.tight_layout()
+    out = BytesIO()
+    fig.savefig(out, format="png", bbox_inches="tight")
+    plt.close(fig)
+    encoded = base64.b64encode(out.getvalue()).decode("ascii")
+
+    return json.dumps({
+        "image": "data:image/png;base64," + encoded,
+        "step": step,
+        "steps": steps,
+        "w0": float(w0_itr),
+        "w1": float(w1_itr),
+        "loss": float(loss_val),
+    })
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v314.0.5/full/";
+  var PLAY_DURATION_MS = 3000;
+  var MAX_PLAYBACK_FRAMES = 31;
+
+  var controls = {
+    form: document.getElementById("settings-form"),
+    lr: document.getElementById("lr"),
+    w0Init: document.getElementById("w0-init"),
+    w1Init: document.getElementById("w1-init"),
+    steps: document.getElementById("steps"),
+    runButton: document.getElementById("run-button"),
+    stepSlider: document.getElementById("step-slider"),
+    stepNumber: document.getElementById("step-number"),
+    message: document.getElementById("message"),
+    plotImage: document.getElementById("plot-image"),
+    placeholder: document.getElementById("placeholder"),
+    w0Output: document.getElementById("w0-output"),
+    w1Output: document.getElementById("w1-output"),
+    lossOutput: document.getElementById("loss-output")
+  };
+
+  var pyodide = null;
+  var renderPython = null;
+  var ready = null;
+  var renderTimer = null;
+  var renderSerial = 0;
+  var lastArgs = null;
+  var isPlaying = false;
+  var playbackToken = 0;
+  var playbackFrame = null;
+
+  function setMessage(text, isError) {
+    controls.message.textContent = text;
+    controls.message.classList.toggle("error", Boolean(isError));
+  }
+
+  function setControlsDisabled(disabled) {
+    var shouldDisable = disabled || isPlaying || !renderPython;
+    controls.runButton.disabled = shouldDisable;
+    controls.stepSlider.disabled = shouldDisable;
+    controls.stepNumber.disabled = shouldDisable;
+  }
+
+  function readNumber(input, name) {
+    var value = Number(input.value);
+    if (!Number.isFinite(value)) {
+      throw new Error(name + " must be a finite number.");
+    }
+    return value;
+  }
+
+  function readArgs() {
+    var steps = Math.floor(readNumber(controls.steps, "Training steps"));
+    if (steps < 0 || steps > 2000) {
+      throw new Error("Training steps must be between 0 and 2000.");
+    }
+    var lr = readNumber(controls.lr, "Learning rate");
+    if (lr < 0) {
+      throw new Error("Learning rate must be 0 or greater.");
+    }
+    return {
+      lr: lr,
+      w0Init: readNumber(controls.w0Init, "Initial w0"),
+      w1Init: readNumber(controls.w1Init, "Initial w1"),
+      steps: steps
+    };
+  }
+
+  function formatFixed(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return value.toFixed(4);
+  }
+
+  function formatSci(value) {
+    if (!Number.isFinite(value)) {
+      return "NaN";
+    }
+    return value.toExponential(2).replace("e", "E");
+  }
+
+  function updateStepControls(step, steps) {
+    controls.stepSlider.max = String(steps);
+    controls.stepNumber.max = String(steps);
+    controls.stepSlider.value = String(step);
+    controls.stepNumber.value = String(step);
+  }
+
+  function updateResult(result) {
+    controls.plotImage.src = result.image;
+    controls.plotImage.hidden = false;
+    controls.placeholder.hidden = true;
+    updateStepControls(result.step, result.steps);
+    controls.w0Output.value = formatFixed(result.w0);
+    controls.w1Output.value = formatFixed(result.w1);
+    controls.lossOutput.value = formatSci(result.loss);
+  }
+
+  function cancelPlayback() {
+    isPlaying = false;
+    playbackToken += 1;
+    if (playbackFrame !== null) {
+      cancelAnimationFrame(playbackFrame);
+      playbackFrame = null;
+    }
+  }
+
+  async function initPyodideRuntime() {
+    try {
+      setMessage("Loading Python runtime...", false);
+      controls.placeholder.textContent = "Loading Python runtime...";
+      pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+
+      setMessage("Loading NumPy and Matplotlib...", false);
+      controls.placeholder.textContent = "Loading NumPy and Matplotlib...";
+      await pyodide.loadPackage(["numpy", "matplotlib"]);
+
+      setMessage("Preparing logistic regression code...", false);
+      await pyodide.runPythonAsync(document.getElementById("python-code").textContent);
+      renderPython = pyodide.globals.get("render_logistic_regression");
+
+      setMessage("Ready.", false);
+      setControlsDisabled(false);
+      await renderFromForm(0);
+    } catch (error) {
+      setControlsDisabled(true);
+      controls.placeholder.textContent = "Pyodide could not load.";
+      setMessage(error.message || String(error), true);
+      throw error;
+    }
+  }
+
+  async function renderPlot(args, step, options) {
+    options = options || {};
+    if (!renderPython) {
+      await ready;
+    }
+    var serial = renderSerial + 1;
+    renderSerial = serial;
+    setControlsDisabled(true);
+    if (!options.keepMessage) {
+      setMessage(options.message || "Rendering plot...", false);
+    }
+    try {
+      var resultJson = renderPython(
+        args.lr,
+        args.w0Init,
+        args.w1Init,
+        args.steps,
+        step
+      );
+      if (serial === renderSerial) {
+        updateResult(JSON.parse(resultJson));
+        if (!options.keepMessage) {
+          setMessage("Ready.", false);
+        }
+      }
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    } finally {
+      if (serial === renderSerial && !isPlaying) {
+        setControlsDisabled(false);
+      }
+    }
+  }
+
+  async function renderFromForm(step) {
+    try {
+      lastArgs = readArgs();
+      updateStepControls(Math.max(0, Math.min(step, lastArgs.steps)), lastArgs.steps);
+      await renderPlot(lastArgs, step);
+    } catch (error) {
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  async function playFromForm() {
+    try {
+      cancelPlayback();
+      clearTimeout(renderTimer);
+      lastArgs = readArgs();
+      updateStepControls(0, lastArgs.steps);
+
+      if (lastArgs.steps === 0) {
+        await renderPlot(lastArgs, 0);
+        return;
+      }
+
+      isPlaying = true;
+      playbackToken += 1;
+      var token = playbackToken;
+      var frameCount = Math.min(MAX_PLAYBACK_FRAMES, lastArgs.steps + 1);
+      var startedAt = performance.now();
+      var lastFrameIndex = -1;
+
+      setControlsDisabled(true);
+      setMessage("Playing training steps...", false);
+
+      async function playFrame() {
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        var elapsed = performance.now() - startedAt;
+        var progress = Math.min(1, elapsed / PLAY_DURATION_MS);
+        var frameIndex = Math.round(progress * (frameCount - 1));
+        var step = Math.round(frameIndex * lastArgs.steps / (frameCount - 1));
+        updateStepControls(step, lastArgs.steps);
+
+        if (frameIndex !== lastFrameIndex) {
+          lastFrameIndex = frameIndex;
+          await renderPlot(lastArgs, step, { keepMessage: true });
+        }
+
+        if (!isPlaying || token !== playbackToken) {
+          return;
+        }
+
+        if (performance.now() - startedAt >= PLAY_DURATION_MS) {
+          if (lastFrameIndex !== frameCount - 1) {
+            updateStepControls(lastArgs.steps, lastArgs.steps);
+            await renderPlot(lastArgs, lastArgs.steps, { keepMessage: true });
+          }
+          if (token === playbackToken) {
+            isPlaying = false;
+            playbackFrame = null;
+            setControlsDisabled(false);
+            setMessage("Ready.", false);
+          }
+          return;
+        }
+
+        playbackFrame = requestAnimationFrame(playFrame);
+      }
+
+      playbackFrame = requestAnimationFrame(playFrame);
+    } catch (error) {
+      isPlaying = false;
+      setControlsDisabled(false);
+      setMessage(error.message || String(error), true);
+    }
+  }
+
+  function scheduleStepRender(step) {
+    clearTimeout(renderTimer);
+    controls.stepNumber.value = String(step);
+    renderTimer = setTimeout(function () {
+      if (lastArgs) {
+        renderPlot(lastArgs, step);
+      }
+    }, 120);
+  }
+
+  controls.form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    playFromForm();
+  });
+
+  controls.stepSlider.addEventListener("input", function () {
+    cancelPlayback();
+    scheduleStepRender(Number(controls.stepSlider.value));
+  });
+
+  controls.stepNumber.addEventListener("change", function () {
+    cancelPlayback();
+    var value = Math.max(0, Math.min(Number(controls.stepNumber.value), Number(controls.stepNumber.max)));
+    updateStepControls(value, Number(controls.stepNumber.max));
+    scheduleStepRender(value);
+  });
+
+  setControlsDisabled(true);
+  ready = initPyodideRuntime();
+})();
+</script>
+</body>
+</html>

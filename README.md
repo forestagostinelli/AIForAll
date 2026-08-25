@@ -4,6 +4,8 @@
 
 Code to reproduce instructional material for AI for All.
 
+[In-browser visualizations](https://forestagostinelli.github.io/AIForAll/)
+
 ## Installation
 If a conda session is active run:\
 `conda deactivate`
