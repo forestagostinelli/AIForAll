@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI for All — Interactive Visualizations</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f6f8;
+            color: #222;
+        }
+
+        header {
+            background: white;
+            border-bottom: 1px solid #ddd;
+            padding: 48px 24px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0 0 12px;
+            font-size: 2.5rem;
+        }
+
+        header p {
+            margin: 0;
+            font-size: 1.15rem;
+            color: #555;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+
+        .tutorial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+        }
+
+        .tutorial-card {
+            display: block;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 28px;
+            color: inherit;
+            text-decoration: none;
+            transition:
+                transform 0.15s ease,
+                box-shadow 0.15s ease,
+                border-color 0.15s ease;
+        }
+
+        .tutorial-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .tutorial-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+            border-color: #aaa;
+        }
+
+        .tutorial-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.4rem;
+        }
+
+        .tutorial-card p {
+            margin: 0 0 22px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .open {
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            color: #777;
+            padding: 40px 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>AI for All</h1>
+    <p>
+        Click a topic below to explore an interactive visualization.
+    </p>
+</header>
+
+<main>
+    <div class="tutorial-grid">
+
+        <a class="tutorial-card" href="linear_regression.html">
+            <img
+                class="tutorial-image"
+                src="../misc/images/lin_regress.png"
+                alt="Linear regression visualization"
+            >
+
+            <h2>Linear Regression</h2>
+            <p>
+                Explore how gradient descent learns the slope and bias
+                of a linear model.
+            </p>
+            <span class="open">Open visualization →</span>
+        </a>
+
+    </div>
+</main>
+
+<footer>
+    AI for All
+</footer>
+
+</body>
+</html>
