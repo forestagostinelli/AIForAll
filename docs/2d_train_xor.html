@@ -484,13 +484,15 @@ def update_all_decision_boundaries(axs, x, y, x1_mesh, x2_mesh, mesh_points, mes
     )
 
 
-def get_run_state(lr: float, steps: int, optimizer_name: str):
-    cache_key = (float(lr), int(steps), optimizer_name)
+def get_run_state(lr: float, steps: int, optimizer_name: str, init_seed: int):
+    init_seed = int(init_seed) % (2 ** 32 - 1)
+    cache_key = (float(lr), int(steps), optimizer_name, init_seed)
     if cache_key in _RUN_CACHE:
         return _RUN_CACHE[cache_key]
 
     np.random.seed(42)
     x, y = get_xor_data()
+    np.random.seed(init_seed)
     params_l, losses, accuracies = train_params(x, y, lr, steps, optimizer_name)
 
     mesh_size: int = 100
@@ -517,7 +519,7 @@ def get_run_state(lr: float, steps: int, optimizer_name: str):
     return state
 
 
-def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
+def render_xor_training(lr: float, steps: int, optimizer_name: str, init_seed: int, step: int):
     steps = int(steps)
     step = int(step)
     if steps < 0:
@@ -527,7 +529,7 @@ def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
     if optimizer_name not in OPTIMIZER_STEPS:
         raise ValueError("Optimizer must be 'adam' or 'sgd'.")
 
-    run_state = get_run_state(lr, steps, optimizer_name)
+    run_state = get_run_state(lr, steps, optimizer_name, init_seed)
     step = max(0, min(step, steps))
     params = run_state["params_l"][step]
     loss_val: float = run_state["losses"][step]
@@ -641,6 +643,21 @@ def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
     };
   }
 
+  function makeRunSeed() {
+    if (window.crypto && window.crypto.getRandomValues) {
+      var values = new Uint32Array(1);
+      window.crypto.getRandomValues(values);
+      return values[0];
+    }
+    return Math.floor(Math.random() * 4294967295);
+  }
+
+  function newRunArgs() {
+    var args = readArgs();
+    args.initSeed = makeRunSeed();
+    return args;
+  }
+
   function formatSci(value) {
     if (!Number.isFinite(value)) {
       return "NaN";
@@ -738,7 +755,7 @@ def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
       setMessage(options.message || "Rendering plot...", false);
     }
     try {
-      var resultJson = renderPython(args.lr, args.steps, args.optimizer, step);
+      var resultJson = renderPython(args.lr, args.steps, args.optimizer, args.initSeed, step);
       if (serial === renderSerial) {
         updateResult(JSON.parse(resultJson));
         if (!options.keepMessage) {
@@ -756,7 +773,7 @@ def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
 
   async function renderFromForm(step) {
     try {
-      lastArgs = readArgs();
+      lastArgs = newRunArgs();
       updateStepControls(Math.max(0, Math.min(step, lastArgs.steps)), lastArgs.steps);
       await renderPlot(lastArgs, step);
     } catch (error) {
@@ -768,7 +785,7 @@ def render_xor_training(lr: float, steps: int, optimizer_name: str, step: int):
     try {
       cancelPlayback();
       clearTimeout(renderTimer);
-      lastArgs = readArgs();
+      lastArgs = newRunArgs();
       updateStepControls(0, lastArgs.steps);
 
       if (lastArgs.steps === 0) {
